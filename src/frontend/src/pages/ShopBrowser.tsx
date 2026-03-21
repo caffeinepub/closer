@@ -9,7 +9,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, MapPin, Package, Search, Store, X } from "lucide-react";
+import {
+  Loader2,
+  MapPin,
+  Package,
+  Search,
+  ShoppingBag,
+  Store,
+  User,
+  X,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { SiFacebook, SiInstagram, SiTiktok, SiWhatsapp } from "react-icons/si";
@@ -310,6 +319,7 @@ function ShopProductsModal({
                   min="1"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePlaceOrder()}
                   className="rounded-xl"
                   data-ocid="shop.quantity_input"
                 />
@@ -420,23 +430,9 @@ export default function ShopBrowser() {
         <span className="font-display text-xl font-extrabold gold-text tracking-widest">
           CLOSER
         </span>
-        <div className="flex items-center gap-3">
-          {isAuthenticated && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-full gold-border gold-text"
-              onClick={() => setPage("shop-owner")}
-              data-ocid="shop.go_to_office_button"
-            >
-              <Store className="w-4 h-4 mr-1" />
-              My Office
-            </Button>
-          )}
-          <span className="text-sm text-muted-foreground flex items-center gap-1">
-            <Store className="w-4 h-4" /> Shops ({shops.length})
-          </span>
-        </div>
+        <span className="text-sm text-muted-foreground flex items-center gap-1">
+          <Store className="w-4 h-4" /> Shops ({shops.length})
+        </span>
       </header>
 
       {isOffline && (
@@ -448,7 +444,7 @@ export default function ShopBrowser() {
         </div>
       )}
 
-      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto w-full">
+      <main className="flex-1 px-4 py-6 pb-24 max-w-5xl mx-auto w-full">
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -549,6 +545,49 @@ export default function ShopBrowser() {
           onClose={() => setSelectedShop(null)}
         />
       )}
+
+      {/* Bottom navigation bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border flex items-stretch h-16"
+        data-ocid="shop.nav"
+      >
+        <button
+          type="button"
+          onClick={() => setPage("shop-browser")}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 gold-text transition-colors"
+          data-ocid="shop.market.tab"
+          aria-label="Market"
+        >
+          <span className="scale-110 transition-transform">
+            <ShoppingBag className="w-6 h-6" />
+          </span>
+          <span className="text-[10px]">Market</span>
+        </button>
+        {isAuthenticated && (
+          <button
+            type="button"
+            onClick={() => setPage("customer")}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            data-ocid="shop.customer.tab"
+            aria-label="Customer"
+          >
+            <User className="w-6 h-6" />
+            <span className="text-[10px]">My Orders</span>
+          </button>
+        )}
+        {isAuthenticated && (
+          <button
+            type="button"
+            onClick={() => setPage("shop-owner")}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            data-ocid="shop.office.tab"
+            aria-label="Office"
+          >
+            <Store className="w-6 h-6" />
+            <span className="text-[10px]">My Office</span>
+          </button>
+        )}
+      </nav>
 
       <footer className="text-center py-4 text-muted-foreground text-xs border-t border-border">
         © {new Date().getFullYear()}. Built with ❤️ using{" "}

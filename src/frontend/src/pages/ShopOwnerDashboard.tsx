@@ -353,6 +353,7 @@ export default function ShopOwnerDashboard() {
                 onChange={(e) =>
                   setProdForm((p) => ({ ...p, name: e.target.value }))
                 }
+                onKeyDown={(e) => e.key === "Enter" && handleCreateProduct()}
                 className="rounded-xl"
                 placeholder="e.g. Fresh Bread"
               />
@@ -365,6 +366,7 @@ export default function ShopOwnerDashboard() {
                 onChange={(e) =>
                   setProdForm((p) => ({ ...p, price: e.target.value }))
                 }
+                onKeyDown={(e) => e.key === "Enter" && handleCreateProduct()}
                 className="rounded-xl"
                 type="number"
                 step="0.01"
@@ -541,6 +543,9 @@ export default function ShopOwnerDashboard() {
                                 ...p,
                                 [key]: e.target.value,
                               }))
+                            }
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && handleCreateShop()
                             }
                             className="rounded-xl"
                           />

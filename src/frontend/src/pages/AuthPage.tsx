@@ -169,6 +169,7 @@ export default function AuthPage() {
                 placeholder="e.g. John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
                 className="rounded-xl"
               />
             </div>
@@ -180,6 +181,7 @@ export default function AuthPage() {
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
                 className="rounded-xl"
               />
             </div>

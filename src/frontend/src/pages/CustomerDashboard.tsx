@@ -18,6 +18,7 @@ import {
   Search,
   ShoppingBag,
   Store,
+  User,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
@@ -265,26 +266,12 @@ export default function CustomerDashboard() {
         <span className="font-display text-xl font-extrabold gold-text tracking-widest">
           CLOSER
         </span>
-        <div className="flex items-center gap-3">
-          {isAuthenticated && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-full gold-border gold-text"
-              onClick={() => setPage("shop-owner")}
-              data-ocid="customer.go_to_office_button"
-            >
-              <Store className="w-4 h-4 mr-1" />
-              My Office
-            </Button>
-          )}
-          <span className="text-sm text-muted-foreground flex items-center gap-1">
-            <ShoppingBag className="w-4 h-4" /> My Orders ({myOrders.length})
-          </span>
-        </div>
+        <span className="text-sm text-muted-foreground flex items-center gap-1">
+          <ShoppingBag className="w-4 h-4" /> My Orders ({myOrders.length})
+        </span>
       </header>
 
-      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto w-full">
+      <main className="flex-1 px-4 py-6 pb-24 max-w-5xl mx-auto w-full">
         <Tabs defaultValue="browse">
           <TabsList
             className="w-full rounded-full mb-6"
@@ -405,6 +392,7 @@ export default function CustomerDashboard() {
                   min="1"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePlaceOrder()}
                   className="rounded-xl"
                   data-ocid="customer.quantity_input"
                 />
@@ -434,6 +422,47 @@ export default function CustomerDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bottom navigation bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border flex items-stretch h-16"
+        data-ocid="customer.nav"
+      >
+        <button
+          type="button"
+          onClick={() => setPage("shop-browser")}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+          data-ocid="customer.market.tab"
+          aria-label="Market"
+        >
+          <ShoppingBag className="w-6 h-6" />
+          <span className="text-[10px]">Market</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPage("customer")}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 gold-text transition-colors"
+          data-ocid="customer.customer.tab"
+          aria-label="Customer"
+        >
+          <span className="scale-110 transition-transform">
+            <User className="w-6 h-6" />
+          </span>
+          <span className="text-[10px]">My Orders</span>
+        </button>
+        {isAuthenticated && (
+          <button
+            type="button"
+            onClick={() => setPage("shop-owner")}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            data-ocid="customer.office.tab"
+            aria-label="Office"
+          >
+            <Store className="w-6 h-6" />
+            <span className="text-[10px]">My Office</span>
+          </button>
+        )}
+      </nav>
 
       <footer className="text-center py-4 text-muted-foreground text-xs border-t border-border">
         © {new Date().getFullYear()}. Built with ❤️ using{" "}
