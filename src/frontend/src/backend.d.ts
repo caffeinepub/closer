@@ -28,9 +28,11 @@ export interface Shop {
     tiktok: string;
     owner: Principal;
     instagram: string;
+    logo?: ExternalBlob;
     name: string;
     whatsapp: string;
     description: string;
+    paymentNumbers: string;
     facebook: string;
     longitude: number;
     address: string;
@@ -43,6 +45,7 @@ export interface Order {
     productId: bigint;
     paymentProof?: ExternalBlob;
     quantity: bigint;
+    paymentNote: string;
     commissionAmount: bigint;
     customerId: Principal;
     totalPrice: bigint;
@@ -50,6 +53,7 @@ export interface Order {
 export interface UserProfile {
     name: string;
     email: string;
+    profilePicture?: ExternalBlob;
     preferredTheme: string;
 }
 export interface Product {
@@ -74,6 +78,7 @@ export interface backendInterface {
     deleteShop(shopId: bigint): Promise<void>;
     getAllProducts(): Promise<Array<Product>>;
     getAllShops(): Promise<Array<Shop>>;
+    getAllUserProfiles(): Promise<Array<[Principal, UserProfile]>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getMyNotifications(): Promise<Array<Notification>>;
@@ -91,7 +96,11 @@ export interface backendInterface {
     registerProfile(name: string, email: string, preferredTheme: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateOrderStatus(orderId: bigint, status: string): Promise<void>;
-    updatePaymentProof(orderId: bigint, paymentProof: ExternalBlob): Promise<void>;
+    updatePaymentNote(orderId: bigint, paymentNote: string): Promise<void>;
     updateProduct(productId: bigint, name: string, description: string, price: bigint, category: string, image: ExternalBlob, stock: bigint): Promise<void>;
+    updateProfilePicture(callerProfilePicture: ExternalBlob): Promise<void>;
     updateShop(shopId: bigint, name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string): Promise<void>;
+    updateShopLogo(shopId: bigint, shopLogo: ExternalBlob): Promise<void>;
+    updateShopPaymentNumbers(shopId: bigint, paymentNumbers: string): Promise<void>;
+    uploadPaymentProof(orderId: bigint, paymentProof: ExternalBlob, paymentNote: string): Promise<void>;
 }

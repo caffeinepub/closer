@@ -41,9 +41,11 @@ export const Shop = IDL.Record({
   'tiktok' : IDL.Text,
   'owner' : IDL.Principal,
   'instagram' : IDL.Text,
+  'logo' : IDL.Opt(ExternalBlob),
   'name' : IDL.Text,
   'whatsapp' : IDL.Text,
   'description' : IDL.Text,
+  'paymentNumbers' : IDL.Text,
   'facebook' : IDL.Text,
   'longitude' : IDL.Float64,
   'address' : IDL.Text,
@@ -51,6 +53,7 @@ export const Shop = IDL.Record({
 export const UserProfile = IDL.Record({
   'name' : IDL.Text,
   'email' : IDL.Text,
+  'profilePicture' : IDL.Opt(ExternalBlob),
   'preferredTheme' : IDL.Text,
 });
 export const Notification = IDL.Record({
@@ -69,6 +72,7 @@ export const Order = IDL.Record({
   'productId' : IDL.Nat,
   'paymentProof' : IDL.Opt(ExternalBlob),
   'quantity' : IDL.Nat,
+  'paymentNote' : IDL.Text,
   'commissionAmount' : IDL.Nat,
   'customerId' : IDL.Principal,
   'totalPrice' : IDL.Nat,
@@ -123,8 +127,14 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'deleteShop' : IDL.Func([IDL.Nat], [], []),
   'getAllProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
   'getAllShops' : IDL.Func([], [IDL.Vec(Shop)], ['query']),
+  'getAllUserProfiles' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Principal, UserProfile))],
+      ['query'],
+    ),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
@@ -146,12 +156,12 @@ export const idlService = IDL.Service({
   'registerProfile' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
-  'updatePaymentProof' : IDL.Func([IDL.Nat, ExternalBlob], [], []),
   'updateProduct' : IDL.Func(
       [IDL.Nat, IDL.Text, IDL.Text, IDL.Nat, IDL.Text, ExternalBlob, IDL.Nat],
       [],
       [],
     ),
+  'updateProfilePicture' : IDL.Func([ExternalBlob], [], []),
   'updateShop' : IDL.Func(
       [
         IDL.Nat,
@@ -168,6 +178,10 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'updateShopLogo' : IDL.Func([IDL.Nat, ExternalBlob], [], []),
+  'updateShopPaymentNumbers' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+  'updatePaymentNote' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+  'uploadPaymentProof' : IDL.Func([IDL.Nat, ExternalBlob, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -206,9 +220,11 @@ export const idlFactory = ({ IDL }) => {
     'tiktok' : IDL.Text,
     'owner' : IDL.Principal,
     'instagram' : IDL.Text,
+    'logo' : IDL.Opt(ExternalBlob),
     'name' : IDL.Text,
     'whatsapp' : IDL.Text,
     'description' : IDL.Text,
+    'paymentNumbers' : IDL.Text,
     'facebook' : IDL.Text,
     'longitude' : IDL.Float64,
     'address' : IDL.Text,
@@ -216,6 +232,7 @@ export const idlFactory = ({ IDL }) => {
   const UserProfile = IDL.Record({
     'name' : IDL.Text,
     'email' : IDL.Text,
+    'profilePicture' : IDL.Opt(ExternalBlob),
     'preferredTheme' : IDL.Text,
   });
   const Notification = IDL.Record({
@@ -234,6 +251,7 @@ export const idlFactory = ({ IDL }) => {
     'productId' : IDL.Nat,
     'paymentProof' : IDL.Opt(ExternalBlob),
     'quantity' : IDL.Nat,
+    'paymentNote' : IDL.Text,
     'commissionAmount' : IDL.Nat,
     'customerId' : IDL.Principal,
     'totalPrice' : IDL.Nat,
@@ -288,8 +306,14 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'deleteShop' : IDL.Func([IDL.Nat], [], []),
     'getAllProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'getAllShops' : IDL.Func([], [IDL.Vec(Shop)], ['query']),
+    'getAllUserProfiles' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Principal, UserProfile))],
+        ['query'],
+      ),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
@@ -311,12 +335,12 @@ export const idlFactory = ({ IDL }) => {
     'registerProfile' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
-    'updatePaymentProof' : IDL.Func([IDL.Nat, ExternalBlob], [], []),
     'updateProduct' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Text, IDL.Nat, IDL.Text, ExternalBlob, IDL.Nat],
         [],
         [],
       ),
+    'updateProfilePicture' : IDL.Func([ExternalBlob], [], []),
     'updateShop' : IDL.Func(
         [
           IDL.Nat,
@@ -333,6 +357,10 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'updateShopLogo' : IDL.Func([IDL.Nat, ExternalBlob], [], []),
+    'updateShopPaymentNumbers' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+    'updatePaymentNote' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+  'uploadPaymentProof' : IDL.Func([IDL.Nat, ExternalBlob, IDL.Text], [], []),
   });
 };
 

@@ -27,6 +27,7 @@ export interface Order {
   'productId' : bigint,
   'paymentProof' : [] | [ExternalBlob],
   'quantity' : bigint,
+  'paymentNote' : string,
   'commissionAmount' : bigint,
   'customerId' : Principal,
   'totalPrice' : bigint,
@@ -47,9 +48,11 @@ export interface Shop {
   'tiktok' : string,
   'owner' : Principal,
   'instagram' : string,
+  'logo' : [] | [ExternalBlob],
   'name' : string,
   'whatsapp' : string,
   'description' : string,
+  'paymentNumbers' : string,
   'facebook' : string,
   'longitude' : number,
   'address' : string,
@@ -57,6 +60,7 @@ export interface Shop {
 export interface UserProfile {
   'name' : string,
   'email' : string,
+  'profilePicture' : [] | [ExternalBlob],
   'preferredTheme' : string,
 }
 export type UserRole = { 'admin' : null } |
@@ -99,8 +103,10 @@ export interface _SERVICE {
     [string, string, string, number, number, string, string, string, string],
     bigint
   >,
+  'deleteShop' : ActorMethod<[bigint], undefined>,
   'getAllProducts' : ActorMethod<[], Array<Product>>,
   'getAllShops' : ActorMethod<[], Array<Shop>>,
+  'getAllUserProfiles' : ActorMethod<[], Array<[Principal, UserProfile]>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getMyNotifications' : ActorMethod<[], Array<Notification>>,
@@ -118,11 +124,11 @@ export interface _SERVICE {
   'registerProfile' : ActorMethod<[string, string, string], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'updateOrderStatus' : ActorMethod<[bigint, string], undefined>,
-  'updatePaymentProof' : ActorMethod<[bigint, ExternalBlob], undefined>,
   'updateProduct' : ActorMethod<
     [bigint, string, string, bigint, string, ExternalBlob, bigint],
     undefined
   >,
+  'updateProfilePicture' : ActorMethod<[ExternalBlob], undefined>,
   'updateShop' : ActorMethod<
     [
       bigint,
@@ -138,6 +144,10 @@ export interface _SERVICE {
     ],
     undefined
   >,
+  'updateShopLogo' : ActorMethod<[bigint, ExternalBlob], undefined>,
+  'updateShopPaymentNumbers' : ActorMethod<[bigint, string], undefined>,
+  'updatePaymentNote' : ActorMethod<[bigint, string], undefined>,
+  'uploadPaymentProof' : ActorMethod<[bigint, ExternalBlob, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

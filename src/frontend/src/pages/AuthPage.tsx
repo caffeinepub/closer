@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -11,7 +11,8 @@ import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 export default function AuthPage() {
-  const { login, loginStatus, isLoggingIn, identity } = useInternetIdentity();
+  const { login, loginStatus, isLoggingIn, isLoginError, identity } =
+    useInternetIdentity();
   const { actor } = useActor();
   const { setPage, setRole, setProfile, setIsAuthenticated } = useAuth();
 
@@ -20,10 +21,53 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [popupBlocked, setPopupBlocked] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleConnect() {
-    await login();
+  function handleConnect() {
+    setPopupBlocked(false);
+
+    // Step 1: Open a blank popup SYNCHRONOUSLY in the click handler.
+    // Browsers allow this because we are directly inside a user gesture.
+    const preOpened = window.open(
+      "about:blank",
+      "ii-login-window",
+      "width=525,height=705,left=100,top=100,toolbar=0,location=0,menubar=0,resizable=1,scrollbars=1",
+    );
+
+    if (!preOpened || preOpened.closed) {
+      // Browser blocked even our synchronous open — user must allow popups manually.
+      setPopupBlocked(true);
+      return;
+    }
+
+    // Step 2: Temporarily replace window.open so that when auth-client calls it
+    // internally, it gets our already-opened window back instead of trying to
+    // open a second one (which would be blocked as non-user-gesture).
+    const originalOpen = window.open.bind(window);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).open = (
+      url?: string | URL,
+      _target?: string,
+      _features?: string,
+    ) => {
+      // Navigate our pre-opened window to the requested URL.
+      if (url && preOpened && !preOpened.closed) {
+        preOpened.location.href = url.toString();
+      }
+      return preOpened;
+    };
+
+    // Step 3: Restore original window.open after a tick so only auth-client's
+    // immediate call is intercepted.
+    setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).open = originalOpen;
+    }, 200);
+
+    // Step 4: Call the auth-client login — it will use our intercepted window.open.
+    login();
   }
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -40,7 +84,6 @@ export default function AuthPage() {
     if (!actor || !name.trim()) return;
     setSaving(true);
     try {
-      // Save avatar to localStorage
       const principal = identity?.getPrincipal().toString();
       if (principal && avatarPreview) {
         localStorage.setItem(`avatar_${principal}`, avatarPreview);
@@ -71,6 +114,8 @@ export default function AuthPage() {
     setStep("profile");
   }
 
+  const showError = isLoginError || popupBlocked;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <motion.div
@@ -94,18 +139,101 @@ export default function AuthPage() {
             <p className="text-center text-foreground font-medium">
               Connect your identity to continue
             </p>
-            <Button
-              data-ocid="auth.login_button"
-              size="lg"
-              className="rounded-full font-bold"
-              onClick={handleConnect}
-              disabled={isLoggingIn}
-            >
-              {isLoggingIn ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isLoggingIn ? "Connecting..." : "Login with Internet Identity"}
-            </Button>
+
+            {showError ? (
+              <div
+                className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex flex-col gap-3"
+                data-ocid="auth.login_error_state"
+              >
+                <p className="text-destructive text-sm font-semibold text-center">
+                  🚫 Login window was blocked
+                </p>
+                <p className="text-destructive/80 text-xs text-center">
+                  Your browser is blocking popups. Allow popups for this site
+                  then tap Retry Login.
+                </p>
+
+                <Button
+                  data-ocid="auth.login_button"
+                  size="lg"
+                  className="rounded-full font-bold w-full"
+                  onClick={handleConnect}
+                  disabled={isLoggingIn}
+                >
+                  {isLoggingIn ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {isLoggingIn ? "Connecting..." : "🔄 Retry Login"}
+                </Button>
+
+                <button
+                  type="button"
+                  className="flex items-center justify-center gap-1 text-xs text-destructive/70 hover:text-destructive transition-colors mx-auto"
+                  onClick={() => setShowInstructions((v) => !v)}
+                >
+                  {showInstructions ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                  {showInstructions
+                    ? "Hide instructions"
+                    : "How to allow popups"}
+                </button>
+
+                {showInstructions && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex flex-col gap-2 text-xs text-foreground/80"
+                  >
+                    <div className="bg-background/60 rounded-lg p-2">
+                      <p className="font-semibold mb-1">🌐 Chrome / Edge</p>
+                      <p>
+                        Tap the blocked popup icon (🚫) in the address bar →
+                        &quot;Always allow popups from this site&quot; → Done.
+                      </p>
+                    </div>
+                    <div className="bg-background/60 rounded-lg p-2">
+                      <p className="font-semibold mb-1">🦊 Firefox</p>
+                      <p>
+                        Click the blocked bar at the top → &quot;Allow popups
+                        for this site&quot;.
+                      </p>
+                    </div>
+                    <div className="bg-background/60 rounded-lg p-2">
+                      <p className="font-semibold mb-1">🧭 Safari</p>
+                      <p>
+                        Safari → Settings → Websites → Pop-up Windows → set this
+                        site to &quot;Allow&quot;.
+                      </p>
+                    </div>
+                    <div className="bg-background/60 rounded-lg p-2">
+                      <p className="font-semibold mb-1">📱 Samsung Browser</p>
+                      <p>
+                        ⋮ Menu → Settings → Sites and downloads → Block pop-ups
+                        → turn OFF, then retry.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            ) : (
+              <Button
+                data-ocid="auth.login_button"
+                size="lg"
+                className="rounded-full font-bold"
+                onClick={handleConnect}
+                disabled={isLoggingIn}
+              >
+                {isLoggingIn ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {isLoggingIn ? "Connecting..." : "Login with Internet Identity"}
+              </Button>
+            )}
+
             <Button
               data-ocid="auth.guest_button"
               variant="outline"

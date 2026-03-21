@@ -1,171 +1,115 @@
 import { Button } from "@/components/ui/button";
-import {
-  Bell,
-  MapPin,
-  Palette,
-  Shield,
-  ShoppingBag,
-  Store,
-} from "lucide-react";
-import { motion } from "motion/react";
-import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
-import type { Theme } from "../context/ThemeContext";
+import { MapPin, ShoppingBag, Star } from "lucide-react";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
-const features = [
-  {
-    icon: ShoppingBag,
-    title: "Smart Shopping",
-    desc: "Browse local stores, search products, place orders in seconds.",
-  },
-  {
-    icon: Store,
-    title: "Shop Management",
-    desc: "Full dashboard for shop owners — products, orders, social links.",
-  },
-  {
-    icon: MapPin,
-    title: "Location-Based",
-    desc: "Find shops within 10 km. See exact distances in meters or km.",
-  },
-  {
-    icon: Bell,
-    title: "Live Notifications",
-    desc: "Sound alerts for new orders, even in the background.",
-  },
-  {
-    icon: Shield,
-    title: "10% Commission",
-    desc: "Platform earns 10% per order. Transparent breakdown on every sale.",
-  },
-  {
-    icon: Palette,
-    title: "3 Themes",
-    desc: "Dark, Light, or Gold — switch anytime from any screen.",
-  },
-];
-
-export default function LandingPage() {
-  const { setPage } = useAuth();
-  const { theme, setTheme } = useTheme();
-  const themes: Theme[] = ["dark", "light", "gold"];
+export function LandingPage() {
+  const { login, isLoggingIn } = useInternetIdentity();
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Navbar */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <span className="font-display text-2xl font-extrabold gold-text tracking-widest">
-          CLOSER
-        </span>
-        <div className="flex items-center gap-3">
-          {themes.map((t) => (
-            <button
-              type="button"
-              key={t}
-              data-ocid={`landing.${t}_toggle`}
-              onClick={() => setTheme(t)}
-              className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                theme === t ? "border-primary scale-110" : "border-border"
-              } ${
-                t === "dark"
-                  ? "bg-[#0F0F10]"
-                  : t === "light"
-                    ? "bg-[#F5F5F5]"
-                    : "bg-[#D4AF5A]"
-              }`}
-              title={`${t} theme`}
-            />
-          ))}
-          <Button
-            data-ocid="landing.signin_button"
-            onClick={() => setPage("auth")}
-            className="rounded-full px-6 font-semibold"
-          >
-            Sign In
-          </Button>
-        </div>
-      </header>
-
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "hsl(var(--background))" }}
+    >
       {/* Hero */}
-      <main className="flex-1">
-        <section className="flex flex-col items-center justify-center text-center px-6 py-24 gap-6">
-          <motion.h1
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="text-5xl md:text-7xl font-extrabold uppercase tracking-tight leading-none"
-          >
-            The Marketplace
-            <br />
-            <span className="gold-text">Built for You</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-            className="text-lg text-muted-foreground max-w-xl"
-          >
-            Connect with local shops, order products nearby, and manage your
-            store — all in one place.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex gap-4 flex-wrap justify-center"
-          >
-            <Button
-              data-ocid="landing.get_started_button"
-              size="lg"
-              className="rounded-full px-10 font-bold text-base"
-              onClick={() => setPage("auth")}
-            >
-              Get Started
-            </Button>
-            <Button
-              data-ocid="landing.browse_shops_button"
-              size="lg"
-              variant="outline"
-              className="rounded-full px-10 font-bold text-base gold-border gold-text"
-              onClick={() => setPage("shop-browser")}
-            >
-              Browse Shops
-            </Button>
-          </motion.div>
-        </section>
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div
+          className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6 shadow-xl overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #C2185B, #FF00AA)" }}
+        >
+          <img
+            src="/assets/generated/closer-to-market-icon-transparent.dim_512x512.png"
+            alt="Closer to Market"
+            className="w-full h-full object-cover"
+          />
+        </div>
 
-        {/* Features */}
-        <section className="px-6 py-16 max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-10">
-            Everything You Need
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f, i) => (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.08 }}
-                className="bg-card rounded-2xl p-6 border border-border hover:border-primary transition-colors"
-              >
-                <f.icon className="w-8 h-8 mb-3 gold-text" />
-                <h3 className="font-bold text-lg mb-1">{f.title}</h3>
-                <p className="text-muted-foreground text-sm">{f.desc}</p>
-              </motion.div>
-            ))}
+        <h1
+          className="text-4xl font-bold mb-1 tracking-tight"
+          style={{
+            background: "linear-gradient(135deg, #C2185B, #FF00AA)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          Closer
+        </h1>
+        <p
+          className="text-base font-semibold mb-2"
+          style={{ color: "#E91E8C" }}
+        >
+          to Market
+        </p>
+        <p
+          className="text-sm mb-2"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          Soko lako karibu nawe
+        </p>
+        <p
+          className="text-sm max-w-xs mb-10 leading-relaxed"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          Gundua maduka yaliyo karibu nawe, agiza bidhaa, na fuatilia malipo —
+          yote mahali pamoja.
+        </p>
+
+        <Button
+          onClick={login}
+          disabled={isLoggingIn}
+          data-ocid="landing.login.primary_button"
+          size="lg"
+          className="w-full max-w-xs text-base font-semibold py-6 rounded-xl"
+          style={{
+            background: "linear-gradient(135deg, #C2185B, #FF00AA)",
+            color: "#fff",
+            border: "none",
+          }}
+        >
+          {isLoggingIn ? "Inaingiza..." : "Ingia / Jiandikishe"}
+        </Button>
+
+        <p
+          className="mt-4 text-xs"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          Hakuna akaunti inayohitajika — tumia Internet Identity
+        </p>
+      </div>
+
+      {/* Features */}
+      <div className="px-6 pb-12 grid grid-cols-3 gap-4 max-w-sm mx-auto w-full">
+        {[
+          { icon: MapPin, label: "Maduka karibu" },
+          { icon: ShoppingBag, label: "Agiza haraka" },
+          { icon: Star, label: "Duka lako" },
+        ].map(({ icon: Icon, label }) => (
+          <div
+            key={label}
+            className="flex flex-col items-center gap-2 p-3 rounded-xl"
+            style={{ background: "hsl(var(--card))" }}
+          >
+            <Icon size={20} style={{ color: "#E91E8C" }} />
+            <span
+              className="text-xs text-center font-medium"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              {label}
+            </span>
           </div>
-        </section>
-      </main>
+        ))}
+      </div>
 
       {/* Footer */}
-      <footer className="text-center py-6 text-muted-foreground text-sm border-t border-border">
-        © {new Date().getFullYear()}. Built with ❤️ using{" "}
+      <footer
+        className="text-center pb-6 text-xs"
+        style={{ color: "hsl(var(--muted-foreground))" }}
+      >
+        &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"
           rel="noreferrer"
-          className="gold-text hover:underline"
+          style={{ color: "#E91E8C" }}
         >
           caffeine.ai
         </a>

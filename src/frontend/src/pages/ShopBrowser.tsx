@@ -1,3 +1,4 @@
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,599 +8,767 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Loader2,
+  ExternalLink,
+  Facebook,
+  Instagram,
+  Locate,
   MapPin,
-  Package,
+  MessageCircle,
+  Navigation,
   Search,
-  ShoppingBag,
-  Store,
-  User,
-  X,
+  ShoppingCart,
 } from "lucide-react";
-import { motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { SiFacebook, SiInstagram, SiTiktok, SiWhatsapp } from "react-icons/si";
 import { toast } from "sonner";
-import type { Product, Shop } from "../backend.d";
+import type { Product, Shop } from "../backend";
+import {
+  useAllShops,
+  usePlaceOrder,
+  useShopProducts,
+} from "../hooks/useQueries";
+import { calcDistance, formatDistance } from "../utils/distance";
 
-import { useAuth } from "../context/AuthContext";
-import { useActor } from "../hooks/useActor";
-import { formatDistance, haversineDistance } from "../utils/distance";
-
-function ProductImage({ product }: { product: Product }) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let url: string;
-    product.image
-      .getBytes()
-      .then((bytes) => {
-        if (bytes.length === 0) return;
-        url = URL.createObjectURL(new Blob([bytes]));
-        setImgUrl(url);
-      })
-      .catch(() => {});
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [product.image]);
+function ShopAvatar({ shop, size = 40 }: { shop: Shop; size?: number }) {
+  const logoUrl = shop.logo?.getDirectURL?.() || null;
+  const initials = shop.name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+  const colors = [
+    "hsl(220,70%,50%)",
+    "hsl(150,60%,40%)",
+    "hsl(330,60%,50%)",
+    "hsl(30,80%,50%)",
+    "hsl(260,60%,55%)",
+    "hsl(190,70%,40%)",
+  ];
+  const colorIdx =
+    shop.name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) %
+    colors.length;
+  const bgColor = colors[colorIdx];
 
   return (
-    <div className="aspect-square bg-muted relative overflow-hidden">
-      {imgUrl ? (
-        <img
-          src={imgUrl}
-          alt={product.name}
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Package className="w-8 h-8 text-muted-foreground" />
+    <Avatar style={{ width: size, height: size, flexShrink: 0 }}>
+      <AvatarImage
+        src={logoUrl || undefined}
+        alt={shop.name}
+        loading={size >= 50 ? "eager" : "lazy"}
+      />
+      <AvatarFallback
+        style={{
+          background: bgColor,
+          color: "white",
+          fontSize: size < 50 ? "0.7rem" : "1rem",
+          fontWeight: 700,
+        }}
+      >
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+function ProductCard({
+  product,
+  onOrder,
+}: { product: Product; onOrder: (p: Product) => void }) {
+  const imageUrl = product.image.getDirectURL();
+  const [imgLoaded, setImgLoaded] = useState(false);
+  return (
+    <div
+      className="rounded-xl overflow-hidden border"
+      style={{
+        background: "hsl(var(--muted))",
+        borderColor: "hsl(var(--border))",
+      }}
+    >
+      <div
+        className="aspect-square w-full overflow-hidden"
+        style={{ background: "hsl(var(--secondary))" }}
+      >
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setImgLoaded(true)}
+            style={{
+              opacity: imgLoaded ? 1 : 0,
+              transition: "opacity 0.3s ease",
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ShoppingCart
+              size={24}
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            />
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        <p
+          className="font-semibold text-sm truncate"
+          style={{ color: "hsl(var(--card-foreground))" }}
+        >
+          {product.name}
+        </p>
+        <p
+          className="text-xs mt-0.5"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          {product.category}
+        </p>
+        <div className="flex items-center justify-between mt-2">
+          <span
+            className="font-bold text-sm"
+            style={{ color: "hsl(var(--primary))" }}
+          >
+            TZS {Number(product.price).toLocaleString()}
+          </span>
+          <Badge variant="outline" className="text-xs">
+            {Number(product.stock)}
+          </Badge>
         </div>
-      )}
+        <Button
+          size="sm"
+          onClick={() => onOrder(product)}
+          data-ocid="browser.order.primary_button"
+          className="w-full mt-2 text-xs font-semibold"
+          style={{
+            background: "hsl(var(--primary))",
+            color: "hsl(var(--primary-foreground))",
+          }}
+          disabled={Number(product.stock) === 0}
+        >
+          {Number(product.stock) === 0 ? "Imeisha" : "Agiza"}
+        </Button>
+      </div>
     </div>
   );
 }
 
+type ShopWithDistance = Shop & { distance: number | null };
+
 function ShopCard({
   shop,
-  distance,
-  onClick,
+  idx,
+  onSelect,
 }: {
-  shop: Shop;
-  distance: number | null;
-  onClick: () => void;
+  shop: ShopWithDistance;
+  idx: number;
+  onSelect: (s: ShopWithDistance) => void;
 }) {
   return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      className="bg-card border border-border rounded-2xl p-5 hover:border-primary transition-colors flex flex-col gap-3"
-      data-ocid="shop.card"
+    <button
+      type="button"
+      onClick={() => onSelect(shop)}
+      data-ocid={`browser.shop.item.${idx + 1}`}
+      className="w-full text-left rounded-xl p-3 border transition-all active:scale-[0.98]"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--border))",
+        WebkitTapHighlightColor: "transparent",
+        touchAction: "manipulation",
+      }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-bold text-base">{shop.name}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-            {shop.description}
-          </p>
+      <div className="flex items-start gap-3">
+        <ShopAvatar shop={shop} size={44} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p
+              className="font-semibold"
+              style={{ color: "hsl(var(--card-foreground))" }}
+            >
+              {shop.name}
+            </p>
+            {shop.distance !== null && (
+              <div
+                className="flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full text-xs font-bold"
+                style={{
+                  background: "hsl(var(--primary) / 0.12)",
+                  color: "hsl(var(--primary))",
+                }}
+              >
+                <Navigation size={11} />
+                <span>{formatDistance(shop.distance)}</span>
+              </div>
+            )}
+          </div>
+          <div
+            className="flex items-center gap-1 mt-0.5"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            <MapPin size={11} />
+            <span className="text-xs truncate">{shop.address}</span>
+          </div>
+          {shop.description && (
+            <p
+              className="text-xs mt-1 line-clamp-1"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              {shop.description}
+            </p>
+          )}
         </div>
-        {distance !== null && (
-          <Badge
-            variant="secondary"
-            className="shrink-0 text-xs flex items-center gap-1"
-          >
-            <MapPin className="w-3 h-3" />
-            {formatDistance(distance)}
-          </Badge>
-        )}
       </div>
-      <p className="text-xs text-muted-foreground flex items-center gap-1">
-        <MapPin className="w-3 h-3" />
-        {shop.address}
-      </p>
-      {/* Social Links */}
-      <div
-        className="flex gap-3 items-center"
-        role="presentation"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {shop.tiktok && (
-          <a
-            href={shop.tiktok}
-            target="_blank"
-            rel="noreferrer"
-            data-ocid="shop.tiktok_link"
-          >
-            <SiTiktok className="w-4 h-4" />
-          </a>
-        )}
-        {shop.facebook && (
-          <a
-            href={shop.facebook}
-            target="_blank"
-            rel="noreferrer"
-            className="text-blue-500"
-            data-ocid="shop.facebook_link"
-          >
-            <SiFacebook className="w-4 h-4" />
-          </a>
-        )}
-        {shop.instagram && (
-          <a
-            href={shop.instagram}
-            target="_blank"
-            rel="noreferrer"
-            className="text-pink-500"
-            data-ocid="shop.instagram_link"
-          >
-            <SiInstagram className="w-4 h-4" />
-          </a>
-        )}
-        {shop.whatsapp && (
-          <a
-            href={`https://wa.me/${shop.whatsapp.replace(/\D/g, "")}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-green-500"
-            data-ocid="shop.whatsapp_link"
-          >
-            <SiWhatsapp className="w-4 h-4" />
-          </a>
-        )}
-      </div>
-      <Button
-        size="sm"
-        className="rounded-full w-full mt-1"
-        onClick={onClick}
-        data-ocid="shop.open_button"
-      >
-        View Products & Order
-      </Button>
-    </motion.div>
+    </button>
   );
 }
 
-function ShopProductsModal({
+function ShopModal({
   shop,
   onClose,
+  userPos,
 }: {
-  shop: Shop;
+  shop: ShopWithDistance;
   onClose: () => void;
+  userPos: { lat: number; lon: number } | null;
 }) {
-  const { actor, isFetching } = useActor();
-  const qc = useQueryClient();
+  const { data: products, isLoading } = useShopProducts(shop.id);
+  const placeOrder = usePlaceOrder();
   const [orderProduct, setOrderProduct] = useState<Product | null>(null);
-  const [quantity, setQuantity] = useState("1");
-  const [placing, setPlacing] = useState(false);
+  const [qty, setQty] = useState(1);
+  const [paymentInfo, setPaymentInfo] = useState<{
+    total: number;
+    paymentNumbers: string;
+  } | null>(null);
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
-    queryKey: ["shopProducts", shop.id.toString()],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getShopProducts(shop.id);
-    },
-    enabled: !!actor && !isFetching,
-  });
+  const distance = userPos
+    ? calcDistance(userPos.lat, userPos.lon, shop.latitude, shop.longitude)
+    : null;
 
-  async function handlePlaceOrder() {
-    if (!actor) {
-      toast.error("Please login to place orders");
-      return;
-    }
+  const confirmOrder = () => {
     if (!orderProduct) return;
-    setPlacing(true);
-    try {
-      await actor.placeOrder(orderProduct.id, BigInt(Number(quantity) || 1));
-      toast.success("Order placed!");
-      qc.invalidateQueries({ queryKey: ["myOrders"] });
-      setOrderProduct(null);
-    } catch {
-      toast.error("Failed to place order");
-    } finally {
-      setPlacing(false);
-    }
-  }
+    placeOrder.mutate(
+      { productId: orderProduct.id, quantity: BigInt(qty) },
+      {
+        onSuccess: () => {
+          toast.success("Agizo limetumwa!");
+          const total = Number(orderProduct.price) * qty;
+          setPaymentInfo({ total, paymentNumbers: shop.paymentNumbers || "" });
+          setOrderProduct(null);
+        },
+        onError: () => toast.error("Hitilafu — jaribu tena"),
+      },
+    );
+  };
 
   return (
-    <>
-      <Dialog open onOpenChange={(v) => !v && onClose()}>
-        <DialogContent
-          className="bg-card border-border rounded-2xl max-h-[85vh] overflow-y-auto w-full max-w-lg"
-          data-ocid="shop.products_dialog"
-        >
-          <DialogHeader>
-            <div className="flex items-start justify-between">
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        className="max-w-lg max-h-[90vh] overflow-y-auto"
+        data-ocid="shop_modal.dialog"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--border))",
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle style={{ color: "hsl(var(--card-foreground))" }}>
+            <div className="flex items-center gap-3">
+              <ShopAvatar shop={shop} size={64} />
               <div>
-                <DialogTitle className="text-lg font-bold">
-                  {shop.name}
-                </DialogTitle>
-                {shop.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {shop.description}
-                  </p>
+                <p className="font-bold text-lg">{shop.name}</p>
+                {distance !== null && (
+                  <div
+                    className="flex items-center gap-1 text-sm mt-0.5"
+                    style={{ color: "hsl(var(--primary))" }}
+                  >
+                    <Navigation size={13} />
+                    <span className="font-semibold">
+                      {formatDistance(distance)} kutoka kwako
+                    </span>
+                  </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                data-ocid="shop.products_dialog.close_button"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
-          </DialogHeader>
+          </DialogTitle>
+        </DialogHeader>
 
+        {/* Shop info */}
+        <div className="space-y-2">
+          <p
+            className="text-sm"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            {shop.description}
+          </p>
+          <div
+            className="flex items-center gap-1 text-sm"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            <MapPin size={14} />
+            <span>{shop.address}</span>
+          </div>
+
+          {/* Social links */}
+          <div className="flex gap-3 pt-1 flex-wrap">
+            {shop.whatsapp && (
+              <a
+                href={`https://wa.me/${shop.whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-xs"
+                style={{ color: "hsl(120,50%,45%)" }}
+              >
+                <MessageCircle size={14} /> WhatsApp
+              </a>
+            )}
+            {shop.instagram && (
+              <a
+                href={`https://instagram.com/${shop.instagram}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-xs"
+                style={{ color: "hsl(330,70%,55%)" }}
+              >
+                <Instagram size={14} /> Instagram
+              </a>
+            )}
+            {shop.facebook && (
+              <a
+                href={`https://facebook.com/${shop.facebook}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-xs"
+                style={{ color: "hsl(220,70%,55%)" }}
+              >
+                <Facebook size={14} /> Facebook
+              </a>
+            )}
+            {shop.tiktok && (
+              <a
+                href={`https://tiktok.com/@${shop.tiktok}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-xs"
+                style={{ color: "hsl(var(--foreground))" }}
+              >
+                <ExternalLink size={14} /> TikTok
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Products */}
+        <div className="mt-4">
+          <h3
+            className="font-semibold text-sm mb-3"
+            style={{ color: "hsl(var(--foreground))" }}
+          >
+            Bidhaa
+          </h3>
           {isLoading ? (
-            <div
-              className="flex justify-center py-8"
-              data-ocid="shop.products_loading_state"
-            >
-              <Loader2 className="w-6 h-6 animate-spin gold-text" />
+            <div className="grid grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-48 rounded-xl" />
+              ))}
             </div>
-          ) : products.length === 0 ? (
-            <div
-              className="text-center py-8 text-muted-foreground"
-              data-ocid="shop.products_empty_state"
-            >
-              <Package className="w-10 h-10 mx-auto mb-2" />
-              No products available yet.
+          ) : products && products.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {products.map((p) => (
+                <ProductCard
+                  key={p.id.toString()}
+                  product={p}
+                  onOrder={setOrderProduct}
+                />
+              ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              {products.map((p, i) => {
-                const price = Number(p.price) / 100;
-                return (
-                  <motion.div
-                    key={p.id.toString()}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="bg-background border border-border rounded-xl overflow-hidden flex flex-col"
-                    data-ocid={`shop.product.item.${i + 1}`}
-                  >
-                    <ProductImage product={p} />
-                    <div className="p-3 flex flex-col gap-2">
-                      <p className="font-semibold text-sm line-clamp-2">
-                        {p.name}
-                      </p>
-                      <p className="gold-text font-bold text-sm">
-                        ${price.toFixed(2)}
-                      </p>
-                      <Button
-                        size="sm"
-                        className="rounded-full w-full"
-                        onClick={() => {
-                          if (!actor) {
-                            toast.error("Please login to place orders");
-                            return;
-                          }
-                          setOrderProduct(p);
-                          setQuantity("1");
-                        }}
-                        data-ocid={`shop.order_button.${i + 1}`}
-                      >
-                        Order
-                      </Button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+            <p
+              className="text-sm text-center py-6"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+              data-ocid="shop_modal.products.empty_state"
+            >
+              Hakuna bidhaa bado
+            </p>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
 
-      {/* Order confirm dialog */}
-      <Dialog
-        open={!!orderProduct}
-        onOpenChange={(v) => !v && setOrderProduct(null)}
-      >
-        <DialogContent
-          className="bg-card border-border rounded-2xl"
-          data-ocid="shop.order_confirm_dialog"
-        >
-          <DialogHeader>
-            <DialogTitle>Confirm Order</DialogTitle>
-          </DialogHeader>
-          {orderProduct && (
-            <div className="flex flex-col gap-4">
-              <p className="font-semibold">{orderProduct.name}</p>
-              <p className="text-muted-foreground text-sm">
-                ${(Number(orderProduct.price) / 100).toFixed(2)} each
-              </p>
-              <div className="flex flex-col gap-1">
-                <Label>Quantity</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handlePlaceOrder()}
-                  className="rounded-xl"
-                  data-ocid="shop.quantity_input"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 rounded-full gold-border gold-text"
-                  onClick={() => setOrderProduct(null)}
-                  data-ocid="shop.order_confirm_dialog.cancel_button"
+        {/* Order confirm */}
+        {orderProduct && (
+          <div
+            className="mt-4 p-4 rounded-xl border"
+            style={{
+              background: "hsl(var(--muted))",
+              borderColor: "hsl(var(--border))",
+            }}
+            data-ocid="order_confirm.panel"
+          >
+            <p
+              className="font-semibold text-sm mb-2"
+              style={{ color: "hsl(var(--foreground))" }}
+            >
+              Agiza: {orderProduct.name}
+            </p>
+            <div className="flex items-center gap-3 mb-3">
+              <span
+                className="text-sm"
+                style={{ color: "hsl(var(--muted-foreground))" }}
+              >
+                Idadi:
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center font-bold"
+                  style={{
+                    background: "hsl(var(--secondary))",
+                    color: "hsl(var(--foreground))",
+                  }}
                 >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 rounded-full"
-                  onClick={handlePlaceOrder}
-                  disabled={placing}
-                  data-ocid="shop.order_confirm_dialog.confirm_button"
+                  -
+                </button>
+                <span
+                  className="w-8 text-center font-semibold"
+                  style={{ color: "hsl(var(--foreground))" }}
                 >
-                  {placing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  {placing ? "Placing..." : "Confirm Order"}
-                </Button>
+                  {qty}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQty((q) => Math.min(Number(orderProduct.stock), q + 1))
+                  }
+                  className="w-8 h-8 rounded-lg flex items-center justify-center font-bold"
+                  style={{
+                    background: "hsl(var(--secondary))",
+                    color: "hsl(var(--foreground))",
+                  }}
+                >
+                  +
+                </button>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+            <div
+              className="text-xs space-y-1 mb-3"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              <div className="flex justify-between">
+                <span>Jumla:</span>
+                <span>
+                  TZS {(Number(orderProduct.price) * qty).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Komisho (10%):</span>
+                <span>
+                  TZS {(Number(orderProduct.price) * qty * 0.1).toFixed(0)}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setOrderProduct(null)}
+                data-ocid="order_confirm.cancel_button"
+                className="flex-1"
+              >
+                Ghairi
+              </Button>
+              <Button
+                size="sm"
+                onClick={confirmOrder}
+                disabled={placeOrder.isPending}
+                data-ocid="order_confirm.confirm_button"
+                className="flex-1"
+                style={{
+                  background: "hsl(var(--primary))",
+                  color: "hsl(var(--primary-foreground))",
+                }}
+              >
+                {placeOrder.isPending ? "Inatuma..." : "Thibitisha"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Payment info after order placed */}
+        {paymentInfo && (
+          <div
+            className="mt-4 p-4 rounded-xl border"
+            style={{
+              background: "hsl(45,90%,55% / 0.08)",
+              borderColor: "hsl(45,90%,55% / 0.4)",
+            }}
+            data-ocid="order_confirm.payment.panel"
+          >
+            <p
+              className="font-bold text-sm mb-2"
+              style={{ color: "hsl(45,90%,40%)" }}
+            >
+              ✅ Agizo limewekwa! / Order placed!
+            </p>
+            <p
+              className="font-semibold text-sm mb-1"
+              style={{ color: "hsl(var(--foreground))" }}
+            >
+              💳 Lipa Hapa / Pay Here
+            </p>
+            {paymentInfo.paymentNumbers ? (
+              <p
+                className="text-sm font-medium mb-1"
+                style={{ color: "hsl(var(--foreground))" }}
+              >
+                {paymentInfo.paymentNumbers}
+              </p>
+            ) : (
+              <p
+                className="text-xs"
+                style={{ color: "hsl(var(--muted-foreground))" }}
+              >
+                Wasiliana na duka kwa maelezo ya malipo.
+              </p>
+            )}
+            <p
+              className="text-xs mt-1"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              Kiasi / Amount: TZS {paymentInfo.total.toLocaleString()}
+            </p>
+            <p
+              className="text-xs mt-2"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              Baada ya kulipa, nenda kwenye "Maagizo Yangu" kupakia uthibitisho.
+            </p>
+            <button
+              type="button"
+              onClick={() => setPaymentInfo(null)}
+              className="mt-2 text-xs underline"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+              data-ocid="order_confirm.payment.close_button"
+            >
+              Funga / Close
+            </button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
-export default function ShopBrowser() {
-  const { actor, isFetching } = useActor();
-  const { isAuthenticated, setPage } = useAuth();
+export function ShopBrowser() {
+  const { data: shops, isLoading } = useAllShops();
   const [search, setSearch] = useState("");
-  const [userLat, setUserLat] = useState<number | null>(null);
-  const [userLon, setUserLon] = useState<number | null>(null);
-  const [showAll, setShowAll] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
-  const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const [selectedShop, setSelectedShop] = useState<ShopWithDistance | null>(
+    null,
+  );
+  const [userPos, setUserPos] = useState<{ lat: number; lon: number } | null>(
+    null,
+  );
+  const [_locationError, setLocationError] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError(true);
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserPos({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setLocationError(false);
+        setLocationLoading(false);
+      },
+      () => {
+        setLocationError(true);
+        setLocationLoading(false);
+      },
+    );
+  };
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        setUserLat(pos.coords.latitude);
-        setUserLon(pos.coords.longitude);
-      },
-      () => {},
+      (pos) =>
+        setUserPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => setLocationError(true),
     );
   }, []);
 
-  const { data: shops = [], isLoading } = useQuery<Shop[]>({
-    queryKey: ["allShops"],
-    queryFn: async () => {
-      if (!actor) {
-        try {
-          const cached = localStorage.getItem("cached_shops");
-          if (cached) {
-            setIsOffline(true);
-            return JSON.parse(cached);
-          }
-        } catch {}
-        return [];
-      }
-      try {
-        const data = await actor.getAllShops();
-        try {
-          localStorage.setItem("cached_shops", JSON.stringify(data));
-        } catch {}
-        setIsOffline(false);
-        return data;
-      } catch {
-        try {
-          const cached = localStorage.getItem("cached_shops");
-          if (cached) {
-            setIsOffline(true);
-            return JSON.parse(cached);
-          }
-        } catch {}
-        return [];
-      }
-    },
-    enabled: !isFetching,
-  });
-
-  const shopsWithDistance = shops.map((s) => ({
-    shop: s,
-    distance:
-      userLat !== null && userLon !== null
-        ? haversineDistance(userLat, userLon, s.latitude, s.longitude)
-        : null,
+  const shopsWithDistance: ShopWithDistance[] = (shops || []).map((shop) => ({
+    ...shop,
+    distance: userPos
+      ? calcDistance(userPos.lat, userPos.lon, shop.latitude, shop.longitude)
+      : null,
   }));
 
-  const nearby = shopsWithDistance.filter(
+  const filtered = shopsWithDistance
+    .filter(
+      (s) =>
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
+        s.address.toLowerCase().includes(search.toLowerCase()),
+    )
+    .sort((a, b) => {
+      if (a.distance === null || b.distance === null) return 0;
+      return a.distance - b.distance;
+    });
+
+  const nearby = filtered.filter(
     (s) => s.distance === null || s.distance <= 10000,
   );
-  const displayed = showAll ? shopsWithDistance : nearby;
-
-  const filtered = displayed.filter(
-    (s) => !search || s.shop.name.toLowerCase().includes(search.toLowerCase()),
+  const farther = filtered.filter(
+    (s) => s.distance !== null && s.distance > 10000,
   );
 
   return (
-    <div className="min-h-screen flex flex-col" data-ocid="shop.page">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-background z-10">
-        <span className="font-display text-xl font-extrabold gold-text tracking-widest">
-          CLOSER
-        </span>
-        <span className="text-sm text-muted-foreground flex items-center gap-1">
-          <Store className="w-4 h-4" /> Shops ({shops.length})
-        </span>
-      </header>
-
-      {isOffline && (
-        <div
-          className="bg-yellow-500/20 text-yellow-500 text-xs text-center py-2 px-4"
-          data-ocid="shop.offline_state"
+    <div
+      className="flex flex-col h-full"
+      style={{ background: "hsl(var(--background))" }}
+    >
+      {/* Header */}
+      <div
+        className="px-4 pt-4 pb-3 sticky top-0 z-10"
+        style={{
+          background: "hsl(var(--background))",
+          borderBottom: "1px solid hsl(var(--border))",
+        }}
+      >
+        <h1
+          className="text-xl font-bold mb-3"
+          style={{ color: "hsl(var(--foreground))" }}
         >
-          Offline — showing cached data
-        </div>
-      )}
-
-      <main className="flex-1 px-4 py-6 pb-24 max-w-5xl mx-auto w-full">
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          Soko
+        </h1>
+        <div className="relative">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          />
           <Input
-            data-ocid="shop.search_input"
-            placeholder="Search shops..."
+            placeholder="Tafuta duka au bidhaa / Search shops..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 rounded-full"
+            className="pl-9"
+            data-ocid="browser.search.search_input"
           />
         </div>
 
-        {userLat !== null &&
-          !showAll &&
-          nearby.length === 0 &&
-          shops.length > 0 && (
-            <div className="text-center py-8" data-ocid="shop.no_nearby_state">
-              <p className="text-muted-foreground mb-3">
-                No shops within 10 km of your location.
-              </p>
-              <Button
-                variant="outline"
-                className="rounded-full gold-border gold-text"
-                onClick={() => setShowAll(true)}
-                data-ocid="shop.show_all_button"
+        <div className="mt-2 flex items-center justify-between">
+          {userPos ? (
+            <div
+              className="flex items-center gap-1.5 text-xs"
+              style={{ color: "hsl(150,55%,45%)" }}
+            >
+              <Locate size={12} />
+              <span>Umbali unaonyeshwa / Distances shown</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span
+                className="text-xs"
+                style={{ color: "hsl(var(--muted-foreground))" }}
               >
-                Show All Available Shops
+                Washa eneo / Enable location
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={requestLocation}
+                disabled={locationLoading}
+                data-ocid="browser.location.primary_button"
+                className="h-6 px-2 text-xs gap-1"
+                style={{
+                  borderColor: "hsl(var(--primary))",
+                  color: "hsl(var(--primary))",
+                }}
+              >
+                <MapPin size={11} />
+                {locationLoading ? "..." : "Tumia Eneo Langu"}
               </Button>
             </div>
           )}
+        </div>
+      </div>
 
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 pb-20">
         {isLoading ? (
-          <div
-            className="flex justify-center py-16"
-            data-ocid="shop.loading_state"
-          >
-            <Loader2 className="w-8 h-8 animate-spin gold-text" />
-          </div>
-        ) : filtered.length === 0 && shops.length > 0 ? (
-          <div
-            className="text-center py-16 text-muted-foreground"
-            data-ocid="shop.empty_state"
-          >
-            No shops found.
-          </div>
+          [1, 2, 3].map((i) => (
+            <Skeleton
+              key={i}
+              className="h-20 rounded-xl"
+              data-ocid="browser.loading_state"
+            />
+          ))
         ) : filtered.length === 0 ? (
           <div
-            className="text-center py-16 text-muted-foreground"
-            data-ocid="shop.empty_state"
+            className="flex flex-col items-center justify-center py-16"
+            data-ocid="browser.shops.empty_state"
           >
-            No shops registered yet. Be the first to open one!
+            <ShoppingCart
+              size={40}
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            />
+            <p
+              className="mt-3 text-sm"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              Hakuna maduka yaliyopatikana
+            </p>
           </div>
         ) : (
           <>
-            {userLat !== null && !showAll && (
-              <p className="text-xs text-muted-foreground mb-4">
-                Showing shops within 10 km · {filtered.length} found
-              </p>
-            )}
-            {showAll && (
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs text-muted-foreground">
-                  Showing all shops ({filtered.length})
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowAll(false)}
-                  className="text-xs gold-text hover:underline"
-                  data-ocid="shop.show_nearby_button"
-                >
-                  Show nearby only
-                </button>
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map(({ shop, distance }, i) => (
-                <motion.div
-                  key={shop.id.toString()}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  data-ocid={`shop.item.${i + 1}`}
-                >
+            {nearby.length > 0 && (
+              <>
+                {userPos && (
+                  <p
+                    className="text-xs font-semibold uppercase tracking-wide"
+                    style={{ color: "hsl(var(--muted-foreground))" }}
+                  >
+                    Karibu nawe (ndani ya 10km)
+                  </p>
+                )}
+                {nearby.map((s, i) => (
                   <ShopCard
-                    shop={shop}
-                    distance={distance}
-                    onClick={() => setSelectedShop(shop)}
+                    key={s.id.toString()}
+                    shop={s}
+                    idx={i}
+                    onSelect={setSelectedShop}
                   />
-                </motion.div>
-              ))}
-            </div>
+                ))}
+              </>
+            )}
+            {farther.length > 0 && (
+              <>
+                <p
+                  className="text-xs font-semibold uppercase tracking-wide mt-2"
+                  style={{ color: "hsl(var(--muted-foreground))" }}
+                >
+                  Maeneo mengine / Other areas
+                </p>
+                {farther.map((s, i) => (
+                  <ShopCard
+                    key={s.id.toString()}
+                    shop={s}
+                    idx={nearby.length + i}
+                    onSelect={setSelectedShop}
+                  />
+                ))}
+              </>
+            )}
           </>
         )}
-      </main>
+      </div>
 
       {selectedShop && (
-        <ShopProductsModal
+        <ShopModal
           shop={selectedShop}
           onClose={() => setSelectedShop(null)}
+          userPos={userPos}
         />
       )}
-
-      {/* Bottom navigation bar */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border flex items-stretch h-16"
-        data-ocid="shop.nav"
-      >
-        <button
-          type="button"
-          onClick={() => setPage("shop-browser")}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 gold-text transition-colors"
-          data-ocid="shop.market.tab"
-          aria-label="Market"
-        >
-          <span className="scale-110 transition-transform">
-            <ShoppingBag className="w-6 h-6" />
-          </span>
-          <span className="text-[10px]">Market</span>
-        </button>
-        {isAuthenticated && (
-          <button
-            type="button"
-            onClick={() => setPage("customer")}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
-            data-ocid="shop.customer.tab"
-            aria-label="Customer"
-          >
-            <User className="w-6 h-6" />
-            <span className="text-[10px]">My Orders</span>
-          </button>
-        )}
-        {isAuthenticated && (
-          <button
-            type="button"
-            onClick={() => setPage("shop-owner")}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
-            data-ocid="shop.office.tab"
-            aria-label="Office"
-          >
-            <Store className="w-6 h-6" />
-            <span className="text-[10px]">My Office</span>
-          </button>
-        )}
-      </nav>
-
-      <footer className="text-center py-4 text-muted-foreground text-xs border-t border-border">
-        © {new Date().getFullYear()}. Built with ❤️ using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="gold-text hover:underline"
-        >
-          caffeine.ai
-        </a>
-      </footer>
     </div>
   );
 }

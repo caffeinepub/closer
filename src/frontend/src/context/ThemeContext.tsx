@@ -8,25 +8,25 @@ import {
 
 export type Theme = "dark" | "light" | "gold";
 
-interface ThemeContextValue {
+interface ThemeContextType {
   theme: Theme;
   setTheme: (t: Theme) => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue>({
+const ThemeContext = createContext<ThemeContextType>({
   theme: "dark",
   setTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem("closer_theme") as Theme) || "dark";
+    return (localStorage.getItem("closer-theme") as Theme) || "dark";
   });
 
-  function setTheme(t: Theme) {
+  const setTheme = (t: Theme) => {
     setThemeState(t);
-    localStorage.setItem("closer_theme", t);
-  }
+    localStorage.setItem("closer-theme", t);
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
