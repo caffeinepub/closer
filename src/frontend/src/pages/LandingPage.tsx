@@ -14,10 +14,12 @@ export function LandingPage() {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
         <div
           className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6 shadow-xl overflow-hidden"
-          style={{ background: "linear-gradient(135deg, #C2185B, #FF00AA)" }}
+          style={{
+            background: "linear-gradient(135deg, #1565C0, #6A1B9A, #FF00AA)",
+          }}
         >
           <img
-            src="/assets/generated/closer-to-market-icon-transparent.dim_512x512.png"
+            src="/assets/generated/app-icon.dim_512x512.png"
             alt="Closer to Market"
             className="w-full h-full object-cover"
           />
