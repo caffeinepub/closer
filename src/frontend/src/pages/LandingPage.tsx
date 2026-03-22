@@ -2,9 +2,13 @@ import { Button } from "@/components/ui/button";
 import { MapPin, ShoppingBag, Star } from "lucide-react";
 import { useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { PrivacyPolicy } from "./PrivacyPolicy";
+import { TermsConditions } from "./TermsConditions";
 
 export function LandingPage() {
   const { login, isLoggingIn } = useInternetIdentity();
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   return (
     <div
@@ -52,8 +56,8 @@ export function LandingPage() {
           className="text-sm max-w-xs mb-10 leading-relaxed"
           style={{ color: "hsl(var(--muted-foreground))" }}
         >
-          Gundua maduka yaliyo karibu nawe, agiza bidhaa, na fuatilia malipo —
-          yote mahali pamoja.
+          Gundua maduka yaliyo karibu nawe, agiza bidhaa, na fuatilia malipo
+          &mdash; yote mahali pamoja.
         </p>
 
         <Button
@@ -75,7 +79,7 @@ export function LandingPage() {
           className="mt-4 text-xs"
           style={{ color: "hsl(var(--muted-foreground))" }}
         >
-          Hakuna akaunti inayohitajika — tumia Internet Identity
+          Hakuna akaunti inayohitajika &mdash; tumia Internet Identity
         </p>
       </div>
 
@@ -104,19 +108,42 @@ export function LandingPage() {
 
       {/* Footer */}
       <footer
-        className="text-center pb-6 text-xs"
+        className="text-center pb-6 px-4 text-xs space-y-2"
         style={{ color: "hsl(var(--muted-foreground))" }}
       >
-        &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          target="_blank"
-          rel="noreferrer"
-          style={{ color: "#E91E8C" }}
-        >
-          caffeine.ai
-        </a>
+        <div className="flex justify-center gap-4">
+          <button
+            type="button"
+            onClick={() => setShowTerms(true)}
+            className="underline hover:opacity-80 transition"
+            style={{ color: "#E91E8C" }}
+          >
+            Masharti ya Matumizi
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPrivacy(true)}
+            className="underline hover:opacity-80 transition"
+            style={{ color: "#E91E8C" }}
+          >
+            Sera ya Faragha
+          </button>
+        </div>
+        <div>
+          &copy; {new Date().getFullYear()}. Built with &#10084;&#65039; using{" "}
+          <a
+            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: "#E91E8C" }}
+          >
+            caffeine.ai
+          </a>
+        </div>
       </footer>
+
+      <TermsConditions open={showTerms} onClose={() => setShowTerms(false)} />
+      <PrivacyPolicy open={showPrivacy} onClose={() => setShowPrivacy(false)} />
     </div>
   );
 }
