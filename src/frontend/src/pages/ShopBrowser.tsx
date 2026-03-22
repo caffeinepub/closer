@@ -24,7 +24,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { Product, Shop } from "../backend";
 import {
-  useAllShops,
+  useActiveShops,
   usePlaceOrder,
   useShopProducts,
 } from "../hooks/useQueries";
@@ -154,7 +154,8 @@ function ProductCard({
   );
 }
 
-type ShopWithDistance = Shop & { distance: number | null };
+type ShopWithDistance = ShopWithAvailability & { distance: number | null };
+type ShopWithAvailability = Shop & { isAvailable: boolean };
 
 function ShopCard({
   shop,
@@ -179,7 +180,19 @@ function ShopCard({
       }}
     >
       <div className="flex items-start gap-3">
-        <ShopAvatar shop={shop} size={44} />
+        <div className="relative shrink-0">
+          <ShopAvatar shop={shop} size={44} />
+          <div
+            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
+            style={{
+              background:
+                shop.isAvailable !== false
+                  ? "hsl(142,70%,45%)"
+                  : "hsl(var(--muted-foreground))",
+              borderColor: "hsl(var(--card))",
+            }}
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p
@@ -355,6 +368,31 @@ function ShopModal({
               </a>
             )}
           </div>
+
+          {/* Payment numbers — visible to customers BEFORE placing order */}
+          {shop.paymentNumbers && (
+            <div
+              className="mt-2 p-3 rounded-xl border"
+              style={{
+                background: "hsl(142 50% 50% / 0.1)",
+                borderColor: "hsl(142 50% 50% / 0.4)",
+              }}
+              data-ocid="shop_modal.payment_numbers.panel"
+            >
+              <p
+                className="font-semibold text-sm mb-1"
+                style={{ color: "hsl(var(--foreground))" }}
+              >
+                💳 Namba za Malipo / Payment Numbers
+              </p>
+              <p
+                className="text-sm font-medium"
+                style={{ color: "hsl(var(--foreground))" }}
+              >
+                {shop.paymentNumbers}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Products */}
@@ -497,8 +535,8 @@ function ShopModal({
           <div
             className="mt-4 p-4 rounded-xl border"
             style={{
-              background: "hsl(45,90%,55% / 0.08)",
-              borderColor: "hsl(45,90%,55% / 0.4)",
+              background: "hsl(45 90% 55% / 0.08)",
+              borderColor: "hsl(45 90% 55% / 0.4)",
             }}
             data-ocid="order_confirm.payment.panel"
           >
@@ -558,7 +596,7 @@ function ShopModal({
 }
 
 export function ShopBrowser() {
-  const { data: shops, isLoading } = useAllShops();
+  const { data: shops, isLoading } = useActiveShops();
   const [search, setSearch] = useState("");
   const [selectedShop, setSelectedShop] = useState<ShopWithDistance | null>(
     null,
@@ -598,6 +636,7 @@ export function ShopBrowser() {
 
   const shopsWithDistance: ShopWithDistance[] = (shops || []).map((shop) => ({
     ...shop,
+    isAvailable: (shop as ShopWithAvailability).isAvailable ?? true,
     distance: userPos
       ? calcDistance(userPos.lat, userPos.lon, shop.latitude, shop.longitude)
       : null,

@@ -19,6 +19,7 @@ export default function AuthPage() {
   const [step, setStep] = useState<"connect" | "profile">("connect");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [adminSecret, setAdminSecret] = useState("");
   const [saving, setSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
@@ -89,7 +90,16 @@ export default function AuthPage() {
         localStorage.setItem(`avatar_${principal}`, avatarPreview);
       }
 
-      await actor.registerProfile(name.trim(), email.trim(), "dark");
+      // If admin secret provided, initialize access control first
+      if (adminSecret.trim()) {
+        try {
+          await actor._initializeAccessControlWithSecret(adminSecret.trim());
+        } catch {
+          // Admin secret may already be set or not matching — continue regardless
+        }
+      }
+
+      await actor.registerProfile(name.trim(), "", email.trim(), "dark");
       const [role, profile] = await Promise.all([
         actor.getCallerUserRole(),
         actor.getMyProfile(),
@@ -312,6 +322,25 @@ export default function AuthPage() {
                 onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
                 className="rounded-xl"
               />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="adminSecret">
+                Neno la Siri (Admin tu) / Admin Secret (optional)
+              </Label>
+              <Input
+                id="adminSecret"
+                type="password"
+                data-ocid="auth.admin_secret_input"
+                placeholder="Admin secret key..."
+                value={adminSecret}
+                onChange={(e) => setAdminSecret(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
+                className="rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">
+                Kama una neno la siri la admin, ingiza hapa / If you have the
+                admin secret, enter it here
+              </p>
             </div>
             <Button
               data-ocid="auth.submit_button"

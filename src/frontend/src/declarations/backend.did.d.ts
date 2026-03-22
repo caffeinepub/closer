@@ -10,6 +10,7 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface AppSettings { 'platformPaymentNumber' : string }
 export type ExternalBlob = Uint8Array;
 export interface Notification {
   'id' : bigint,
@@ -21,9 +22,11 @@ export interface Notification {
 }
 export interface Order {
   'id' : bigint,
+  'customerName' : string,
   'status' : string,
   'paymentStatus' : string,
   'shopId' : bigint,
+  'customerPhone' : string,
   'productId' : bigint,
   'paymentProof' : [] | [ExternalBlob],
   'quantity' : bigint,
@@ -31,6 +34,16 @@ export interface Order {
   'commissionAmount' : bigint,
   'customerId' : Principal,
   'totalPrice' : bigint,
+}
+export interface PaymentReference {
+  'id' : bigint,
+  'status' : string,
+  'referenceNumber' : string,
+  'ownerName' : string,
+  'shopId' : bigint,
+  'ownerId' : Principal,
+  'submittedAt' : bigint,
+  'shopName' : string,
 }
 export interface Product {
   'id' : bigint,
@@ -47,11 +60,13 @@ export interface Shop {
   'latitude' : number,
   'tiktok' : string,
   'owner' : Principal,
+  'subscriptionExpiry' : bigint,
   'instagram' : string,
   'logo' : [] | [ExternalBlob],
   'name' : string,
   'whatsapp' : string,
   'description' : string,
+  'isActive' : boolean,
   'paymentNumbers' : string,
   'facebook' : string,
   'longitude' : number,
@@ -60,6 +75,7 @@ export interface Shop {
 export interface UserProfile {
   'name' : string,
   'email' : string,
+  'phone' : string,
   'profilePicture' : [] | [ExternalBlob],
   'preferredTheme' : string,
 }
@@ -94,6 +110,7 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'approveSubscriptionReference' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createProduct' : ActorMethod<
     [string, string, bigint, string, ExternalBlob, bigint, bigint],
@@ -103,16 +120,22 @@ export interface _SERVICE {
     [string, string, string, number, number, string, string, string, string],
     bigint
   >,
+  'deleteProduct' : ActorMethod<[bigint], undefined>,
   'deleteShop' : ActorMethod<[bigint], undefined>,
+  'getActiveShops' : ActorMethod<[], Array<Shop>>,
   'getAllProducts' : ActorMethod<[], Array<Product>>,
+  'getAllReferences' : ActorMethod<[], Array<PaymentReference>>,
   'getAllShops' : ActorMethod<[], Array<Shop>>,
   'getAllUserProfiles' : ActorMethod<[], Array<[Principal, UserProfile]>>,
+  'getAppSettings' : ActorMethod<[], AppSettings>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getMyNotifications' : ActorMethod<[], Array<Notification>>,
   'getMyOrders' : ActorMethod<[], Array<Order>>,
   'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
+  'getMyReferences' : ActorMethod<[bigint], Array<PaymentReference>>,
   'getOrder' : ActorMethod<[bigint], [] | [Order]>,
+  'getPendingReferences' : ActorMethod<[], Array<PaymentReference>>,
   'getProduct' : ActorMethod<[bigint], [] | [Product]>,
   'getShop' : ActorMethod<[bigint], [] | [Shop]>,
   'getShopOrders' : ActorMethod<[bigint], Array<Order>>,
@@ -121,9 +144,13 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'markNotificationAsRead' : ActorMethod<[bigint], undefined>,
   'placeOrder' : ActorMethod<[bigint, bigint], bigint>,
-  'registerProfile' : ActorMethod<[string, string, string], undefined>,
+  'registerProfile' : ActorMethod<[string, string, string, string], undefined>,
+  'rejectSubscriptionReference' : ActorMethod<[bigint], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'submitSubscriptionReference' : ActorMethod<[bigint, string], bigint>,
+  'updateAppSettings' : ActorMethod<[string], undefined>,
   'updateOrderStatus' : ActorMethod<[bigint, string], undefined>,
+  'updatePaymentNote' : ActorMethod<[bigint, string], undefined>,
   'updateProduct' : ActorMethod<
     [bigint, string, string, bigint, string, ExternalBlob, bigint],
     undefined
@@ -146,7 +173,6 @@ export interface _SERVICE {
   >,
   'updateShopLogo' : ActorMethod<[bigint, ExternalBlob], undefined>,
   'updateShopPaymentNumbers' : ActorMethod<[bigint, string], undefined>,
-  'updatePaymentNote' : ActorMethod<[bigint, string], undefined>,
   'uploadPaymentProof' : ActorMethod<[bigint, ExternalBlob, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

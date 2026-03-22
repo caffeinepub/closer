@@ -28,12 +28,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertTriangle,
   Bell,
   Camera,
   Edit2,
+  LogOut,
   MapPin,
   Package,
   Plus,
@@ -44,17 +47,23 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Notification, Order, Product, Shop } from "../backend";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAllShops,
+  useAppSettings,
   useCreateProduct,
   useCreateShop,
+  useDeleteProduct,
   useDeleteShop,
   useMarkNotificationRead,
   useMyNotifications,
   useMyProfile,
+  useMyReferences,
   useShopOrders,
   useShopProducts,
+  useSubmitSubscriptionReference,
+  useToggleShopAvailability,
   useUpdateOrderStatus,
   useUpdateProduct,
   useUpdateShop,
@@ -69,6 +78,8 @@ import {
 } from "../utils/sound";
 
 // ─── Shop Form ────────────────────────────────────────────────────────────────
+type ShopWithAvailability = Shop & { isAvailable: boolean };
+
 type ShopFormData = {
   name: string;
   description: string;
@@ -411,7 +422,7 @@ function ProductForm({
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export function ShopOwnerDashboard() {
-  const { identity } = useInternetIdentity();
+  const { identity, clear } = useInternetIdentity();
   const { data: profile } = useMyProfile();
   const { data: allShops, isLoading: shopsLoading } = useAllShops();
   const myShop =
@@ -422,12 +433,21 @@ export function ShopOwnerDashboard() {
   const { data: products } = useShopProducts(myShop?.id || null);
   const { data: orders } = useShopOrders(myShop?.id || null);
   const { data: notifications } = useMyNotifications();
+  const { data: appSettings } = useAppSettings();
+  const { data: myRefs } = useMyReferences(myShop?.id || null);
+  const submitRef = useSubmitSubscriptionReference();
+  const [showSubModal, setShowSubModal] = useState(false);
+  const [refNumber, setRefNumber] = useState("");
 
   const createShop = useCreateShop();
   const updateShop = useUpdateShop();
   const deleteShop = useDeleteShop();
+  const deleteProduct = useDeleteProduct();
+  const [profileImageOpen, setProfileImageOpen] = useState(false);
+  const [deleteProductId, setDeleteProductId] = useState<bigint | null>(null);
   const updateShopLogo = useUpdateShopLogo();
   const updateShopPaymentNumbers = useUpdateShopPaymentNumbers();
+  const toggleAvailability = useToggleShopAvailability();
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -454,10 +474,37 @@ export function ShopOwnerDashboard() {
   const [notifSound, setNotifSoundState] = useState(
     () => localStorage.getItem("notif_sound") || "beep",
   );
+  const { actor } = useActor();
+  const [adminSecretInput, setAdminSecretInput] = useState("");
+  const [claimingAdmin, setClaimingAdmin] = useState(false);
+  const [isAdminClaimed, setIsAdminClaimed] = useState(false);
   const setNotifSound = (val: string) => {
     setNotifSoundState(val);
     localStorage.setItem("notif_sound", val);
   };
+
+  async function handleClaimAdmin() {
+    if (!actor || !adminSecretInput.trim()) return;
+    setClaimingAdmin(true);
+    try {
+      await (actor as any)._initializeAccessControlWithSecret(
+        adminSecretInput.trim(),
+      );
+      const isNowAdmin = await (actor as any).isCallerAdmin();
+      if (isNowAdmin) {
+        setIsAdminClaimed(true);
+        toast.success(
+          "Umepata haki za Admin! Reload app ili uone Admin Panel.",
+        );
+      } else {
+        toast.error("Neno la siri si sahihi. Jaribu tena.");
+      }
+    } catch {
+      toast.error("Hitilafu - angalia neno la siri na ujaribu tena.");
+    } finally {
+      setClaimingAdmin(false);
+    }
+  }
 
   const unreadCount = notifications?.filter((n) => !n.isRead).length || 0;
   const prevUnread = useRef(unreadCount);
@@ -645,23 +692,35 @@ export function ShopOwnerDashboard() {
             Ofisi Yangu
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNotifications(true)}
-          className="relative p-2 rounded-xl"
-          style={{ background: "hsl(var(--card))" }}
-          data-ocid="office.notifications.open_modal_button"
-        >
-          <Bell size={20} style={{ color: "hsl(var(--foreground))" }} />
-          {unreadCount > 0 && (
-            <span
-              className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
-              style={{ background: "hsl(0,70%,50%)", color: "white" }}
-            >
-              {unreadCount}
-            </span>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNotifications(true)}
+            className="relative p-2 rounded-xl"
+            style={{ background: "hsl(var(--card))" }}
+            data-ocid="office.notifications.open_modal_button"
+          >
+            <Bell size={20} style={{ color: "hsl(var(--foreground))" }} />
+            {unreadCount > 0 && (
+              <span
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+                style={{ background: "hsl(0,70%,50%)", color: "white" }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => clear()}
+            title="Toka / Logout"
+            className="p-2 rounded-xl flex flex-col items-center gap-0.5"
+            style={{ background: "hsl(var(--card))" }}
+            data-ocid="office.logout.button"
+          >
+            <LogOut size={20} style={{ color: "hsl(0,70%,55%)" }} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-20">
@@ -912,8 +971,116 @@ export function ShopOwnerDashboard() {
                     </AlertDialog>
                   </div>
                 </div>
+                <div
+                  className="flex items-center justify-between mt-3 pt-3"
+                  style={{ borderTop: "1px solid hsl(var(--border))" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{
+                        background:
+                          (myShop as ShopWithAvailability).isAvailable !== false
+                            ? "hsl(142,70%,45%)"
+                            : "hsl(var(--muted-foreground))",
+                      }}
+                    />
+                    <span
+                      className="text-sm font-semibold"
+                      style={{
+                        color:
+                          (myShop as ShopWithAvailability).isAvailable !== false
+                            ? "hsl(142,70%,45%)"
+                            : "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      {(myShop as ShopWithAvailability).isAvailable !== false
+                        ? "Wazi / Open"
+                        : "Imefungwa / Closed"}
+                    </span>
+                  </div>
+                  <Switch
+                    checked={
+                      (myShop as ShopWithAvailability).isAvailable !== false
+                    }
+                    onCheckedChange={() => toggleAvailability.mutate(myShop.id)}
+                    disabled={toggleAvailability.isPending}
+                    data-ocid="office.shop.toggle"
+                    style={{ "--switch-thumb": "white" } as React.CSSProperties}
+                  />
+                </div>
               </div>
             )}
+
+            {/* Subscription Status Card */}
+            {myShop &&
+              (() => {
+                const now = Date.now();
+                const expiryMs = Number(myShop.subscriptionExpiry) / 1_000_000;
+                const daysLeft = Math.floor(
+                  (expiryMs - now) / (1000 * 60 * 60 * 24),
+                );
+                const isExpired = !myShop.isActive || expiryMs < now;
+                const isWarning = !isExpired && daysLeft <= 7;
+                if (!isExpired && !isWarning) return null;
+                return (
+                  <div
+                    className="rounded-xl p-3 mb-3 flex items-start gap-2"
+                    style={{
+                      background: isExpired
+                        ? "hsl(0,60%,20%)"
+                        : "hsl(40,80%,15%)",
+                      border: `1px solid ${isExpired ? "hsl(0,60%,40%)" : "hsl(40,80%,45%)"}`,
+                    }}
+                    data-ocid="office.subscription.card"
+                  >
+                    <AlertTriangle
+                      size={16}
+                      style={{
+                        color: isExpired ? "hsl(0,70%,60%)" : "hsl(40,90%,60%)",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                    <div className="flex-1">
+                      <p
+                        className="text-sm font-semibold"
+                        style={{
+                          color: isExpired
+                            ? "hsl(0,70%,70%)"
+                            : "hsl(40,90%,70%)",
+                        }}
+                      >
+                        {isExpired
+                          ? "Usajili umeisha / Subscription expired"
+                          : `Usajili unaisha siku ${daysLeft} / Expires in ${daysLeft} days`}
+                      </p>
+                      {!myShop.isActive && (
+                        <p
+                          className="text-xs mt-1"
+                          style={{ color: "hsl(0,60%,65%)" }}
+                        >
+                          Duka lako halionekani kwa wateja. / Your shop is not
+                          visible to customers.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowSubModal(true)}
+                        data-ocid="office.subscription.primary_button"
+                        className="mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #1565C0, #6A1B9A)",
+                          color: "#fff",
+                        }}
+                      >
+                        ud83dudcb3 Lipa Ada / Pay Fee
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
             {/* Tabs */}
             <Tabs defaultValue="products">
@@ -1061,6 +1228,18 @@ export function ShopOwnerDashboard() {
                               <Edit2 size={10} className="inline mr-0.5" />{" "}
                               Hariri
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteProductId(p.id)}
+                              className="py-1 px-2 rounded text-xs"
+                              style={{
+                                background: "hsl(0,72%,51% / 0.12)",
+                                color: "hsl(0,72%,51%)",
+                                border: "1px solid hsl(0,72%,51% / 0.3)",
+                              }}
+                            >
+                              🗑
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1094,6 +1273,10 @@ export function ShopOwnerDashboard() {
                       key={order.id.toString()}
                       order={order}
                       idx={i}
+                      productName={
+                        (products || []).find((p) => p.id === order.productId)
+                          ?.name || `Bidhaa #${order.productId.toString()}`
+                      }
                       onStatusChange={(status) =>
                         updateOrderStatus.mutate(
                           { orderId: order.id, status, shopId: myShop.id },
@@ -1199,12 +1382,372 @@ export function ShopOwnerDashboard() {
                       ▶ Jaribu / Preview
                     </button>
                   </div>
+
+                  {/* Admin Access Section */}
+                  <div
+                    style={{
+                      marginTop: 24,
+                      paddingTop: 20,
+                      borderTop: "1px solid hsl(var(--border))",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        marginBottom: 8,
+                        color: "hsl(var(--foreground))",
+                        fontSize: 15,
+                      }}
+                    >
+                      🛡️ Haki za Admin / Admin Access
+                    </div>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "hsl(var(--muted-foreground))",
+                        marginBottom: 12,
+                      }}
+                    >
+                      Kama una neno la siri la admin, ingiza hapa ili upate
+                      uwezo wa kusimamia app yote.
+                    </p>
+                    {isAdminClaimed ? (
+                      <div
+                        style={{
+                          padding: "10px 16px",
+                          background: "hsl(120,50%,40%)",
+                          borderRadius: 8,
+                          color: "#fff",
+                          fontWeight: 600,
+                          fontSize: 14,
+                          textAlign: "center",
+                        }}
+                      >
+                        ✅ Admin access imeidhinishwa! Reload ukurasa ili uone
+                        Admin Panel.
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          type="password"
+                          placeholder="Neno la siri la admin..."
+                          value={adminSecretInput}
+                          onChange={(e) => setAdminSecretInput(e.target.value)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleClaimAdmin()
+                          }
+                          data-ocid="settings.admin_secret.input"
+                          style={{
+                            flex: 1,
+                            padding: "10px 14px",
+                            borderRadius: 8,
+                            border: "1px solid hsl(var(--border))",
+                            background: "hsl(var(--background))",
+                            color: "hsl(var(--foreground))",
+                            fontSize: 14,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleClaimAdmin}
+                          disabled={claimingAdmin || !adminSecretInput.trim()}
+                          data-ocid="settings.claim_admin.button"
+                          style={{
+                            padding: "10px 18px",
+                            background:
+                              "linear-gradient(135deg, #1565C0, #6A1B9A)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            fontSize: 14,
+                            opacity:
+                              claimingAdmin || !adminSecretInput.trim()
+                                ? 0.6
+                                : 1,
+                          }}
+                        >
+                          {claimingAdmin ? "..." : "Ingia"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
           </div>
         )}
       </div>
+
+      {/* Profile Image Fullscreen Modal */}
+      {profileImageOpen && profile?.profilePicture?.getDirectURL?.() && (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center w-full"
+          style={{
+            background: "rgba(0,0,0,0.85)",
+            border: "none",
+            cursor: "default",
+          }}
+          onClick={() => setProfileImageOpen(false)}
+        >
+          <img
+            src={profile.profilePicture.getDirectURL()}
+            alt={profile.name}
+            style={{
+              maxWidth: "92vw",
+              maxHeight: "88vh",
+              borderRadius: 16,
+              boxShadow: "0 8px 48px rgba(0,0,0,0.7)",
+              objectFit: "contain",
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setProfileImageOpen(false)}
+            style={{
+              position: "absolute",
+              top: 18,
+              right: 18,
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              cursor: "pointer",
+              color: "#fff",
+              fontSize: 22,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        </button>
+      )}
+
+      {/* Delete Product Confirmation Dialog */}
+      <AlertDialog
+        open={deleteProductId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteProductId(null);
+        }}
+      >
+        <AlertDialogContent
+          style={{
+            background: "hsl(var(--card))",
+            borderColor: "hsl(var(--border))",
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ color: "hsl(var(--foreground))" }}>
+              Futa Bidhaa?
+            </AlertDialogTitle>
+            <AlertDialogDescription
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              Hatua hii haiwezi kurudishwa. Bidhaa itafutwa kabisa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Ghairi</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteProductId !== null) {
+                  deleteProduct.mutate(deleteProductId, {
+                    onSuccess: () => {
+                      toast.success("Bidhaa imefutwa!");
+                      setDeleteProductId(null);
+                    },
+                    onError: () => toast.error("Hitilafu ya kufuta"),
+                  });
+                }
+              }}
+              style={{ background: "hsl(0,72%,51%)", color: "#fff" }}
+            >
+              Futa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Subscription Payment Modal */}
+      <Dialog
+        open={showSubModal}
+        onOpenChange={(o) => {
+          if (!o) {
+            setShowSubModal(false);
+            setRefNumber("");
+          }
+        }}
+      >
+        <DialogContent
+          data-ocid="office.subscription.dialog"
+          style={{
+            background: "hsl(var(--card))",
+            borderColor: "hsl(var(--border))",
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: "hsl(var(--foreground))" }}>
+              ud83dudcb3 Lipa Ada ya Usajili / Pay Subscription Fee
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div
+              className="p-3 rounded-xl text-sm font-semibold text-center"
+              style={{
+                background: "hsl(142,60%,15%)",
+                color: "hsl(142,70%,55%)",
+                border: "1px solid hsl(142,50%,35%)",
+              }}
+            >
+              Ada ya kila mwezi: TSH 10,000
+            </div>
+            {appSettings?.platformPaymentNumber ? (
+              <div
+                className="p-3 rounded-xl text-sm"
+                style={{
+                  background: "hsl(var(--muted))",
+                  color: "hsl(var(--foreground))",
+                }}
+              >
+                <p className="font-semibold mb-1">
+                  Lipa kwa Tigo Pesa / Pay via Tigo Pesa:
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: "hsl(190,80%,35%)", color: "#fff" }}
+                  >
+                    TIGO PESA
+                  </span>
+                  <span
+                    className="text-lg font-bold"
+                    style={{ color: "hsl(200,80%,60%)" }}
+                  >
+                    {appSettings.platformPaymentNumber}
+                  </span>
+                </div>
+                <p
+                  className="text-xs mt-2"
+                  style={{ color: "hsl(var(--muted-foreground))" }}
+                >
+                  Baada ya kulipa, weka reference number hapa chini. / After
+                  paying, enter the reference number below.
+                </p>
+              </div>
+            ) : (
+              <p
+                className="text-sm"
+                style={{ color: "hsl(var(--muted-foreground))" }}
+              >
+                Wasiliana na msimamizi kwa namba ya malipo.
+              </p>
+            )}
+            <div>
+              <Label style={{ color: "hsl(var(--foreground))" }}>
+                Reference Number (6-20 chars)
+              </Label>
+              <Input
+                value={refNumber}
+                onChange={(e) => setRefNumber(e.target.value)}
+                placeholder="ABC123456"
+                className="mt-1"
+                data-ocid="office.subscription_ref.input"
+                maxLength={20}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSubModal(false);
+                  setRefNumber("");
+                }}
+                className="flex-1"
+                data-ocid="office.subscription.cancel_button"
+              >
+                Ghairi
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!myShop) return;
+                  if (
+                    refNumber.trim().length < 6 ||
+                    refNumber.trim().length > 20
+                  ) {
+                    toast.error("Reference number lazima iwe na herufi 6-20");
+                    return;
+                  }
+                  submitRef.mutate(
+                    { shopId: myShop.id, referenceNumber: refNumber.trim() },
+                    {
+                      onSuccess: () => {
+                        toast.success(
+                          "Imepokewa! Admin ataihakikisha hivi karibuni.",
+                        );
+                        setShowSubModal(false);
+                        setRefNumber("");
+                      },
+                      onError: () => toast.error("Hitilafu u2014 jaribu tena"),
+                    },
+                  );
+                }}
+                disabled={submitRef.isPending}
+                className="flex-1 font-semibold"
+                style={{
+                  background: "linear-gradient(135deg, #1565C0, #6A1B9A)",
+                  color: "#fff",
+                }}
+                data-ocid="office.subscription.submit_button"
+              >
+                {submitRef.isPending ? "Inatuma..." : "Tuma / Submit"}
+              </Button>
+            </div>
+            {myRefs && myRefs.length > 0 && (
+              <div
+                className="p-3 rounded-xl text-xs space-y-1"
+                style={{ background: "hsl(var(--muted))" }}
+              >
+                <p
+                  className="font-semibold"
+                  style={{ color: "hsl(var(--foreground))" }}
+                >
+                  Zilizotumwa / Submitted:
+                </p>
+                {myRefs.slice(0, 3).map((r) => (
+                  <div key={r.id.toString()} className="flex justify-between">
+                    <span style={{ color: "hsl(var(--foreground))" }}>
+                      {r.referenceNumber}
+                    </span>
+                    <span
+                      style={{
+                        color:
+                          r.status === "approved"
+                            ? "hsl(120,50%,50%)"
+                            : r.status === "rejected"
+                              ? "hsl(0,60%,50%)"
+                              : "hsl(45,80%,55%)",
+                      }}
+                    >
+                      {r.status === "approved"
+                        ? "u2713 Imeidhinishwa"
+                        : r.status === "rejected"
+                          ? "u2717 Imekataliwa"
+                          : "u23f3 Inasubiri"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Product form dialog */}
       <Dialog
@@ -1299,8 +1842,14 @@ export function ShopOwnerDashboard() {
 function OrderRow({
   order,
   idx,
+  productName,
   onStatusChange,
-}: { order: Order; idx: number; onStatusChange: (s: string) => void }) {
+}: {
+  order: Order;
+  idx: number;
+  productName: string;
+  onStatusChange: (s: string) => void;
+}) {
   const statuses = [
     "pending",
     "confirmed",
@@ -1327,8 +1876,14 @@ function OrderRow({
       <div className="flex items-center justify-between">
         <div>
           <p
-            className="text-sm font-medium"
-            style={{ color: "hsl(var(--card-foreground))" }}
+            className="text-sm font-bold"
+            style={{ color: "hsl(var(--primary))" }}
+          >
+            {productName}
+          </p>
+          <p
+            className="text-xs"
+            style={{ color: "hsl(var(--muted-foreground))" }}
           >
             Agizo #{order.id.toString()}
           </p>
@@ -1342,6 +1897,15 @@ function OrderRow({
           <p className="text-xs" style={{ color: "hsl(45,90%,55%)" }}>
             Komisho: TZS {Number(order.commissionAmount).toLocaleString()}
           </p>
+          {order.customerName && (
+            <p
+              className="text-xs font-medium"
+              style={{ color: "hsl(200,70%,60%)" }}
+            >
+              ud83dudcde Wasiliana: {order.customerName}
+              {order.customerPhone ? ` u2022 ${order.customerPhone}` : ""}
+            </p>
+          )}
         </div>
         <Select value={order.status} onValueChange={onStatusChange}>
           <SelectTrigger

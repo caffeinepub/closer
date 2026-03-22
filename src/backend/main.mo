@@ -1,13 +1,14 @@
 import Iter "mo:core/Iter";
 import Text "mo:core/Text";
 import Map "mo:core/Map";
-
 import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
 import Order "mo:core/Order";
+
+
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Storage "blob-storage/Storage";
@@ -16,12 +17,25 @@ import MixinStorage "blob-storage/Mixin";
 
 actor {
   include MixinStorage();
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
   module Notification {
     public func compare(notification1 : Notification, notification2 : Notification) : Order.Order {
       Int.compare(notification1.timestamp, notification2.timestamp);
+    };
+  };
+
+  module PaymentReference {
+    public func compare(a : PaymentReference, b : PaymentReference) : Order.Order {
+      Nat.compare(a.id, b.id);
+    };
+  };
+
+  module Shop {
+    public func compare(a : Shop, b : Shop) : Order.Order {
+      Nat.compare(a.id, b.id);
     };
   };
 
@@ -34,12 +48,18 @@ actor {
 
   public type UserProfile = {
     name : Text;
+    phone : Text;
     email : Text;
     preferredTheme : Text;
     profilePicture : ?Storage.ExternalBlob;
   };
 
-  type Shop = {
+  public type AppSettings = {
+    platformPaymentNumber : Text;
+  };
+
+  // Core shop type stored in stable Map (unchanged from previous version)
+  public type Shop = {
     id : Nat;
     name : Text;
     description : Text;
@@ -53,9 +73,31 @@ actor {
     owner : Principal;
     logo : ?Storage.ExternalBlob;
     paymentNumbers : Text;
+    subscriptionExpiry : Int;
+    isActive : Bool;
   };
 
-  type Product = {
+  // Extended type returned to frontend (includes availability)
+  public type ShopWithAvailability = {
+    id : Nat;
+    name : Text;
+    description : Text;
+    address : Text;
+    latitude : Float;
+    longitude : Float;
+    tiktok : Text;
+    whatsapp : Text;
+    instagram : Text;
+    facebook : Text;
+    owner : Principal;
+    logo : ?Storage.ExternalBlob;
+    paymentNumbers : Text;
+    subscriptionExpiry : Int;
+    isActive : Bool;
+    isAvailable : Bool;
+  };
+
+  public type Product = {
     id : Nat;
     name : Text;
     description : Text;
@@ -66,9 +108,11 @@ actor {
     shopId : Nat;
   };
 
-  type Order = {
+  public type Order = {
     id : Nat;
     customerId : Principal;
+    customerName : Text;
+    customerPhone : Text;
     productId : Nat;
     shopId : Nat;
     quantity : Nat;
@@ -80,7 +124,7 @@ actor {
     paymentNote : Text;
   };
 
-  type Notification = {
+  public type Notification = {
     id : Nat;
     ownerId : Principal;
     orderId : Nat;
@@ -89,16 +133,59 @@ actor {
     isRead : Bool;
   };
 
+  public type PaymentReference = {
+    id : Nat;
+    shopId : Nat;
+    shopName : Text;
+    ownerId : Principal;
+    ownerName : Text;
+    referenceNumber : Text;
+    status : Text;
+    submittedAt : Int;
+  };
+
   var nextShopId = 1;
   var nextProductId = 1;
   var nextOrderId = 1;
   var nextNotificationId = 1;
+  var nextPaymentReferenceId = 1;
 
   let userProfiles = Map.empty<Principal, UserProfile>();
   let shops = Map.empty<Nat, Shop>();
+  let shopAvailability = Map.empty<Nat, Bool>(); // separate stable map for availability
   let products = Map.empty<Nat, Product>();
   let orders = Map.empty<Nat, Order>();
   let notifications = Map.empty<Nat, Notification>();
+  let paymentReferences = Map.empty<Nat, PaymentReference>();
+
+  var appSettings : AppSettings = {
+    platformPaymentNumber = "16334291";
+  };
+
+  func withAvailability(shop : Shop) : ShopWithAvailability {
+    let avail = switch (shopAvailability.get(shop.id)) {
+      case (null) { true };
+      case (?v) { v };
+    };
+    {
+      id = shop.id;
+      name = shop.name;
+      description = shop.description;
+      address = shop.address;
+      latitude = shop.latitude;
+      longitude = shop.longitude;
+      tiktok = shop.tiktok;
+      whatsapp = shop.whatsapp;
+      instagram = shop.instagram;
+      facebook = shop.facebook;
+      owner = shop.owner;
+      logo = shop.logo;
+      paymentNumbers = shop.paymentNumbers;
+      subscriptionExpiry = shop.subscriptionExpiry;
+      isActive = shop.isActive;
+      isAvailable = avail;
+    };
+  };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -128,12 +215,13 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  public shared ({ caller }) func registerProfile(name : Text, email : Text, preferredTheme : Text) : async () {
+  public shared ({ caller }) func registerProfile(name : Text, phone : Text, email : Text, preferredTheme : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can register profiles");
     };
     let profile : UserProfile = {
       name;
+      phone;
       email;
       preferredTheme;
       profilePicture = null;
@@ -150,6 +238,7 @@ actor {
       case (?profile) {
         let updatedProfile : UserProfile = {
           name = profile.name;
+          phone = profile.phone;
           email = profile.email;
           preferredTheme = profile.preferredTheme;
           profilePicture = ?callerProfilePicture;
@@ -164,6 +253,19 @@ actor {
       Runtime.trap("Unauthorized: Only users can access profiles");
     };
     userProfiles.get(caller);
+  };
+
+  public query ({ caller }) func getAppSettings() : async AppSettings {
+    appSettings;
+  };
+
+  public shared ({ caller }) func updateAppSettings(platformPaymentNumber : Text) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can update app settings");
+    };
+    appSettings := {
+      platformPaymentNumber;
+    };
   };
 
   public shared ({ caller }) func createShop(name : Text, description : Text, address : Text, latitude : Float, longitude : Float, tiktok : Text, whatsapp : Text, instagram : Text, facebook : Text) : async Nat {
@@ -184,11 +286,35 @@ actor {
       owner = caller;
       logo = null;
       paymentNumbers = "";
+      subscriptionExpiry = 0;
+      isActive = false;
     };
     shops.add(nextShopId, shop);
+    shopAvailability.add(nextShopId, true);
     let shopId = nextShopId;
     nextShopId += 1;
     shopId;
+  };
+
+  public shared ({ caller }) func toggleShopAvailability(shopId : Nat) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can toggle shop availability");
+    };
+    switch (shops.get(shopId)) {
+      case (null) { Runtime.trap("Shop does not exist") };
+      case (?shop) {
+        if (shop.owner != caller) {
+          Runtime.trap("Unauthorized: Only shop owner can toggle availability");
+        };
+        let current = switch (shopAvailability.get(shopId)) {
+          case (null) { true };
+          case (?v) { v };
+        };
+        let newVal = not current;
+        shopAvailability.add(shopId, newVal);
+        newVal;
+      };
+    };
   };
 
   public shared ({ caller }) func updateShopLogo(shopId : Nat, shopLogo : Storage.ExternalBlob) : async () {
@@ -215,6 +341,8 @@ actor {
           owner = shop.owner;
           logo = ?shopLogo;
           paymentNumbers = shop.paymentNumbers;
+          subscriptionExpiry = shop.subscriptionExpiry;
+          isActive = shop.isActive;
         };
         shops.add(shopId, updatedShop);
       };
@@ -245,6 +373,8 @@ actor {
           owner = shop.owner;
           logo = shop.logo;
           paymentNumbers;
+          subscriptionExpiry = shop.subscriptionExpiry;
+          isActive = shop.isActive;
         };
         shops.add(shopId, updatedShop);
       };
@@ -275,6 +405,8 @@ actor {
           owner = shop.owner;
           logo = shop.logo;
           paymentNumbers = shop.paymentNumbers;
+          subscriptionExpiry = shop.subscriptionExpiry;
+          isActive = shop.isActive;
         };
         shops.add(shopId, updatedShop);
       };
@@ -292,6 +424,7 @@ actor {
           Runtime.trap("Unauthorized: Only shop owner can delete this shop");
         };
         shops.remove(shopId);
+        shopAvailability.remove(shopId);
       };
     };
   };
@@ -335,7 +468,7 @@ actor {
           case (null) { Runtime.trap("Shop does not exist") };
           case (?shop) {
             if (shop.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-              Runtime.trap("Unauthorized: Only shop owner can update products");
+              Runtime.trap("Unauthorized: Only shop owner can update products for this shop");
             };
             let updatedProduct : Product = {
               id = productId;
@@ -354,6 +487,26 @@ actor {
     };
   };
 
+  public shared ({ caller }) func deleteProduct(productId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete products");
+    };
+    switch (products.get(productId)) {
+      case (null) { Runtime.trap("Product does not exist") };
+      case (?product) {
+        switch (shops.get(product.shopId)) {
+          case (null) { Runtime.trap("Shop does not exist") };
+          case (?shop) {
+            if (shop.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+              Runtime.trap("Unauthorized: Only shop owner can delete products for this shop");
+            };
+            products.remove(productId);
+          };
+        };
+      };
+    };
+  };
+
   public shared ({ caller }) func placeOrder(productId : Nat, quantity : Nat) : async Nat {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can place orders");
@@ -366,24 +519,31 @@ actor {
         };
         let totalPrice = product.price * quantity;
         let commissionAmount = totalPrice / 10;
-        let order : Order = {
-          id = nextOrderId;
-          customerId = caller;
-          productId;
-          shopId = product.shopId;
-          quantity;
-          totalPrice;
-          commissionAmount;
-          status = "pending";
-          paymentStatus = "unpaid";
-          paymentProof = null;
-          paymentNote = "";
+        switch (userProfiles.get(caller)) {
+          case (null) { Runtime.trap("User profile does not exist") };
+          case (?userProfile) {
+            let order : Order = {
+              id = nextOrderId;
+              customerId = caller;
+              customerName = userProfile.name;
+              customerPhone = userProfile.phone;
+              productId;
+              shopId = product.shopId;
+              quantity;
+              totalPrice;
+              commissionAmount;
+              status = "pending";
+              paymentStatus = "unpaid";
+              paymentProof = null;
+              paymentNote = "";
+            };
+            orders.add(nextOrderId, order);
+            let orderId = nextOrderId;
+            nextOrderId += 1;
+            createOrderNotification(product.shopId, orderId, product.name);
+            orderId;
+          };
         };
-        orders.add(nextOrderId, order);
-        let orderId = nextOrderId;
-        nextOrderId += 1;
-        createOrderNotification(product.shopId, orderId);
-        orderId;
       };
     };
   };
@@ -399,11 +559,13 @@ actor {
           case (null) { Runtime.trap("Shop does not exist") };
           case (?shop) {
             if (shop.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-              Runtime.trap("Unauthorized: Only shop owner can update order status");
+              Runtime.trap("Unauthorized: Only shop owner can update status of orders for this shop");
             };
             let updatedOrder : Order = {
               id = orderId;
               customerId = order.customerId;
+              customerName = order.customerName;
+              customerPhone = order.customerPhone;
               productId = order.productId;
               shopId = order.shopId;
               quantity = order.quantity;
@@ -434,6 +596,8 @@ actor {
         let updatedOrder : Order = {
           id = orderId;
           customerId = order.customerId;
+          customerName = order.customerName;
+          customerPhone = order.customerPhone;
           productId = order.productId;
           shopId = order.shopId;
           quantity = order.quantity;
@@ -462,6 +626,8 @@ actor {
         let updatedOrder : Order = {
           id = orderId;
           customerId = order.customerId;
+          customerName = order.customerName;
+          customerPhone = order.customerPhone;
           productId = order.productId;
           shopId = order.shopId;
           quantity = order.quantity;
@@ -477,7 +643,7 @@ actor {
     };
   };
 
-  func createOrderNotification(shopId : Nat, orderId : Nat) {
+  func createOrderNotification(shopId : Nat, orderId : Nat, productName : Text) {
     switch (shops.get(shopId)) {
       case (null) { Runtime.trap("Shop does not exist") };
       case (?shop) {
@@ -485,7 +651,7 @@ actor {
           id = nextNotificationId;
           ownerId = shop.owner;
           orderId;
-          message = "New order received!";
+          message = "Agizo jipya: " # productName;
           timestamp = Time.now();
           isRead = false;
         };
@@ -547,12 +713,15 @@ actor {
     };
   };
 
-  public query ({ caller }) func getAllShops() : async [Shop] {
-    shops.values().toArray();
+  public query ({ caller }) func getAllShops() : async [ShopWithAvailability] {
+    shops.values().toArray().map(withAvailability);
   };
 
-  public query ({ caller }) func getShop(shopId : Nat) : async ?Shop {
-    shops.get(shopId);
+  public query ({ caller }) func getShop(shopId : Nat) : async ?ShopWithAvailability {
+    switch (shops.get(shopId)) {
+      case (null) { null };
+      case (?shop) { ?withAvailability(shop) };
+    };
   };
 
   public query ({ caller }) func getShopProducts(shopId : Nat) : async [Product] {
@@ -584,6 +753,181 @@ actor {
         } else {
           Runtime.trap("Unauthorized: Can only view your own orders or orders for your shop");
         };
+      };
+    };
+  };
+
+  public query ({ caller }) func getActiveShops() : async [ShopWithAvailability] {
+    shops.values().toArray().filter(func(shop) { shop.isActive }).map(withAvailability);
+  };
+
+  public shared ({ caller }) func submitSubscriptionReference(shopId : Nat, referenceNumber : Text) : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can submit subscription references");
+    };
+
+    if (referenceNumber.size() < 6) {
+      Runtime.trap("Reference number must be at least 6 characters");
+    };
+
+    if (referenceNumber.size() > 20) {
+      Runtime.trap("Reference number must be at most 20 characters");
+    };
+
+    if (not referenceNumber.chars().all(func(c) { (c >= '0' and c <= '9') or (c >= 'A' and c <= 'Z') or (c >= 'a' and c <= 'z') })) {
+      Runtime.trap("Reference number must be alphanumeric");
+    };
+
+    let existingReference = paymentReferences.values().find(func(ref) { ref.referenceNumber == referenceNumber });
+    if (existingReference != null) {
+      Runtime.trap("Reference number already exists");
+    };
+
+    let shop = switch (shops.get(shopId)) {
+      case (null) { Runtime.trap("Shop does not exist") };
+      case (?shop) { shop };
+    };
+
+    if (shop.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only shop owner can submit payment references for this shop");
+    };
+
+    switch (userProfiles.get(caller)) {
+      case (null) { Runtime.trap("User profile does not exist, please create a user profile") };
+      case (?userProfile) {
+        let newReference : PaymentReference = {
+          id = nextPaymentReferenceId;
+          shopId;
+          shopName = shop.name;
+          ownerId = caller;
+          ownerName = userProfile.name;
+          referenceNumber;
+          status = "pending";
+          submittedAt = Time.now();
+        };
+
+        paymentReferences.add(nextPaymentReferenceId, newReference);
+        let referenceId = nextPaymentReferenceId;
+        nextPaymentReferenceId += 1;
+
+        let adminNotification : Notification = {
+          id = nextNotificationId;
+          ownerId = Principal.fromText("2vxsx-fae");
+          orderId = 0;
+          message = "Shop " # shop.name # " - " # userProfile.name # " submitted payment reference " # referenceNumber;
+          timestamp = Time.now();
+          isRead = false;
+        };
+        notifications.add(nextNotificationId, adminNotification);
+        nextNotificationId += 1;
+
+        referenceId;
+      };
+    };
+  };
+
+  public shared ({ caller }) func approveSubscriptionReference(referenceId : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can approve subscription references");
+    };
+    switch (paymentReferences.get(referenceId)) {
+      case (null) { Runtime.trap("Reference does not exist") };
+      case (?reference) {
+        if (reference.status == "approved") {
+          Runtime.trap("Reference is already approved");
+        };
+        if (reference.status == "rejected") {
+          Runtime.trap("Reference has already been rejected and cannot be re-approved");
+        };
+        let updatedReference : PaymentReference = {
+          id = referenceId;
+          shopId = reference.shopId;
+          shopName = reference.shopName;
+          ownerId = reference.ownerId;
+          ownerName = reference.ownerName;
+          referenceNumber = reference.referenceNumber;
+          status = "approved";
+          submittedAt = reference.submittedAt;
+        };
+        paymentReferences.add(referenceId, updatedReference);
+
+        switch (shops.get(reference.shopId)) {
+          case (null) { Runtime.trap("Shop does not exist") };
+          case (?shop) {
+            let updatedShop : Shop = {
+              id = shop.id;
+              name = shop.name;
+              description = shop.description;
+              address = shop.address;
+              latitude = shop.latitude;
+              longitude = shop.longitude;
+              tiktok = shop.tiktok;
+              whatsapp = shop.whatsapp;
+              instagram = shop.instagram;
+              facebook = shop.facebook;
+              owner = shop.owner;
+              logo = shop.logo;
+              paymentNumbers = shop.paymentNumbers;
+              subscriptionExpiry = Time.now() + (30 * 24 * 60 * 60 * 1_000_000_000 : Int);
+              isActive = true;
+            };
+            shops.add(shop.id, updatedShop);
+          };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func rejectSubscriptionReference(referenceId : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can reject subscription references");
+    };
+    switch (paymentReferences.get(referenceId)) {
+      case (null) { Runtime.trap("Reference does not exist") };
+      case (?reference) {
+        if (reference.status == "rejected") {
+          Runtime.trap("Reference is already rejected");
+        };
+        let updatedReference : PaymentReference = {
+          id = referenceId;
+          shopId = reference.shopId;
+          shopName = reference.shopName;
+          ownerId = reference.ownerId;
+          ownerName = reference.ownerName;
+          referenceNumber = reference.referenceNumber;
+          status = "rejected";
+          submittedAt = reference.submittedAt;
+        };
+        paymentReferences.add(referenceId, updatedReference);
+      };
+    };
+  };
+
+  public query ({ caller }) func getPendingReferences() : async [PaymentReference] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can view pending references");
+    };
+    paymentReferences.values().filter(func(ref) { ref.status == "pending" }).toArray().sort();
+  };
+
+  public query ({ caller }) func getAllReferences() : async [PaymentReference] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can view all references");
+    };
+    paymentReferences.values().toArray().sort();
+  };
+
+  public query ({ caller }) func getMyReferences(shopId : Nat) : async [PaymentReference] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view their references");
+    };
+    switch (shops.get(shopId)) {
+      case (null) { Runtime.trap("Shop does not exist") };
+      case (?shop) {
+        if (shop.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Only shop owner can view references for this shop");
+        };
+        paymentReferences.values().filter(func(ref) { ref.shopId == shopId }).toArray().sort();
       };
     };
   };

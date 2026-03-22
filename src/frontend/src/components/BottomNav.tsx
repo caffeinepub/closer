@@ -1,17 +1,21 @@
-import { Briefcase, ClipboardList, ShoppingBag } from "lucide-react";
+import { Briefcase, ClipboardList, Shield, ShoppingBag } from "lucide-react";
 
-export type Page = "browser" | "orders" | "office" | "profile";
+export type Page = "browser" | "orders" | "office" | "admin";
 
 interface BottomNavProps {
   current: Page;
   onChange: (p: Page) => void;
+  isAdmin?: boolean;
 }
 
-export function BottomNav({ current, onChange }: BottomNavProps) {
+export function BottomNav({ current, onChange, isAdmin }: BottomNavProps) {
   const items = [
     { id: "browser" as Page, label: "Soko", icon: ShoppingBag },
     { id: "orders" as Page, label: "Maagizo", icon: ClipboardList },
     { id: "office" as Page, label: "Ofisi Yangu", icon: Briefcase, gold: true },
+    ...(isAdmin
+      ? [{ id: "admin" as Page, label: "Admin", icon: Shield, admin: true }]
+      : []),
   ];
 
   return (
@@ -20,8 +24,19 @@ export function BottomNav({ current, onChange }: BottomNavProps) {
       style={{ background: "hsl(var(--card))" }}
       data-ocid="bottom_nav.panel"
     >
-      {items.map(({ id, label, icon: Icon, gold }) => {
+      {items.map(({ id, label, icon: Icon, gold, admin }) => {
         const active = current === id;
+        const color = admin
+          ? active
+            ? "hsl(200,80%,60%)"
+            : "hsl(200,60%,50%)"
+          : gold
+            ? active
+              ? "hsl(45,90%,60%)"
+              : "hsl(45,70%,50%)"
+            : active
+              ? "hsl(var(--primary))"
+              : "hsl(var(--muted-foreground))";
         return (
           <button
             type="button"
@@ -29,36 +44,14 @@ export function BottomNav({ current, onChange }: BottomNavProps) {
             onClick={() => onChange(id)}
             data-ocid={`nav.${id}.link`}
             className="flex flex-1 flex-col items-center gap-0.5 py-2 px-1 text-xs font-medium transition-colors"
-            style={{
-              color: gold
-                ? active
-                  ? "hsl(45,90%,60%)"
-                  : "hsl(45,80%,55%)"
-                : active
-                  ? "hsl(var(--primary))"
-                  : "hsl(var(--muted-foreground))",
-            }}
+            style={{ color }}
           >
             <Icon
               size={22}
               strokeWidth={active ? 2.5 : 1.8}
-              style={{
-                color: gold
-                  ? active
-                    ? "hsl(45,90%,60%)"
-                    : "hsl(45,70%,50%)"
-                  : undefined,
-              }}
+              style={{ color }}
             />
-            <span
-              style={
-                gold
-                  ? { color: active ? "hsl(45,90%,60%)" : "hsl(45,70%,50%)" }
-                  : {}
-              }
-            >
-              {label}
-            </span>
+            <span style={{ color }}>{label}</span>
           </button>
         );
       })}

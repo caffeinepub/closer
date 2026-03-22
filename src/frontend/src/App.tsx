@@ -4,7 +4,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { BottomNav, type Page } from "./components/BottomNav";
 import { ThemeProvider } from "./context/ThemeContext";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
-import { useMyProfile } from "./hooks/useQueries";
+import { useIsAdmin, useMyProfile } from "./hooks/useQueries";
 import { LandingPage } from "./pages/LandingPage";
 
 const CustomerDashboard = lazy(() =>
@@ -22,6 +22,9 @@ const ShopOwnerDashboard = lazy(() =>
 );
 const ProfileSetup = lazy(() =>
   import("./pages/ProfileSetup").then((m) => ({ default: m.ProfileSetup })),
+);
+const AdminPanel = lazy(() =>
+  import("./pages/AdminPanel").then((m) => ({ default: m.AdminPanel })),
 );
 
 function PageLoader() {
@@ -43,10 +46,10 @@ function AppInner() {
   const { identity, isInitializing } = useInternetIdentity();
   const isLoggedIn = !!identity;
   const [page, setPage] = useState<Page>("browser");
-  // Track which pages have been visited so we only mount them when first needed
   const [mounted, setMounted] = useState<Set<Page>>(new Set(["browser"]));
 
   const { data: profile, isLoading: profileLoading } = useMyProfile();
+  const { data: isAdmin } = useIsAdmin();
 
   // Mount page on first visit, keep mounted forever after
   useEffect(() => {
@@ -96,7 +99,6 @@ function AppInner() {
     >
       <main className="flex-1 overflow-hidden relative">
         <Suspense fallback={<PageLoader />}>
-          {/* Keep all visited pages mounted - just hide them with CSS */}
           {mounted.has("browser") && (
             <div
               style={{
@@ -133,9 +135,21 @@ function AppInner() {
               <ShopOwnerDashboard />
             </div>
           )}
+          {isAdmin && mounted.has("admin") && (
+            <div
+              style={{
+                display: page === "admin" ? "flex" : "none",
+                flexDirection: "column",
+                height: "100%",
+                width: "100%",
+              }}
+            >
+              <AdminPanel />
+            </div>
+          )}
         </Suspense>
       </main>
-      <BottomNav current={page} onChange={setPage} />
+      <BottomNav current={page} onChange={setPage} isAdmin={!!isAdmin} />
     </div>
   );
 }

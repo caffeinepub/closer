@@ -14,6 +14,7 @@ import {
 
 export function ProfileSetup() {
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function ProfileSetup() {
       return;
     }
     register.mutate(
-      { name: name.trim(), email: email.trim(), theme },
+      { name: name.trim(), phone: phone.trim(), email: email.trim(), theme },
       {
         onSuccess: async () => {
           toast.success("Umesajiliwa!");
@@ -88,8 +89,8 @@ export function ProfileSetup() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              data-ocid="profile_setup.picture.upload_button"
-              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-md border-2"
+              data-ocid="profile_setup.avatar.upload_button"
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow border-2"
               style={{
                 background: "hsl(var(--primary))",
                 borderColor: "hsl(var(--card))",
@@ -104,82 +105,101 @@ export function ProfileSetup() {
               accept="image/*"
               className="hidden"
               onChange={handleFileChange}
-              data-ocid="profile_setup.picture.input"
             />
           </div>
-          <p
-            className="text-xs mb-1"
-            style={{ color: "hsl(var(--muted-foreground))" }}
-          >
-            Picha ya Wasifu / Profile Picture
-          </p>
+
           <h2
-            className="text-xl font-bold"
+            className="text-xl font-bold mb-1"
             style={{ color: "hsl(var(--foreground))" }}
           >
-            Karibu!
+            Jaza Taarifa Zako
           </h2>
           <p
-            className="text-sm mt-1"
+            className="text-xs text-center"
             style={{ color: "hsl(var(--muted-foreground))" }}
           >
-            Weka maelezo yako ili kuanza
+            Complete your profile to continue
           </p>
         </div>
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="ps-name">Jina lako *</Label>
+            <Label htmlFor="name" style={{ color: "hsl(var(--foreground))" }}>
+              Jina Lako / Your Name *
+            </Label>
             <Input
-              id="ps-name"
+              id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="e.g. Amina Hassan"
+              placeholder="Amina Mohamed"
+              className="mt-1"
               data-ocid="profile_setup.name.input"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="ps-email">Barua pepe (hiari)</Label>
-            <Input
-              id="ps-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="amina@example.com"
-              data-ocid="profile_setup.email.input"
-              className="mt-1"
             />
           </div>
 
           <div>
-            <Label>Mandhari (Theme)</Label>
-            <div className="grid grid-cols-3 gap-2 mt-2">
+            <Label htmlFor="phone" style={{ color: "hsl(var(--foreground))" }}>
+              Namba ya Simu / Phone Number *
+            </Label>
+            <Input
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+255700000000"
+              type="tel"
+              className="mt-1"
+              data-ocid="profile_setup.phone.input"
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="email" style={{ color: "hsl(var(--foreground))" }}>
+              Barua Pepe / Email (hiari)
+            </Label>
+            <Input
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="amina@example.com"
+              type="email"
+              className="mt-1"
+              data-ocid="profile_setup.email.input"
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+          </div>
+
+          <div>
+            <Label style={{ color: "hsl(var(--foreground))" }}>
+              Mandhari / Theme
+            </Label>
+            <div className="grid grid-cols-3 gap-2 mt-1">
               {(["dark", "light", "gold"] as Theme[]).map((t) => (
                 <button
-                  type="button"
                   key={t}
+                  type="button"
+                  data-ocid={`profile_setup.theme_${t}.toggle`}
                   onClick={() => setTheme(t)}
-                  data-ocid={`profile_setup.${t}.toggle`}
-                  className="py-2 px-3 rounded-lg text-sm font-medium border-2 capitalize transition-all"
+                  className="py-2 rounded-lg text-xs font-semibold transition-all border"
                   style={{
+                    background:
+                      theme === t ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                    color:
+                      theme === t
+                        ? "hsl(var(--primary-foreground))"
+                        : "hsl(var(--muted-foreground))",
                     borderColor:
                       theme === t
                         ? "hsl(var(--primary))"
                         : "hsl(var(--border))",
-                    background:
-                      theme === t
-                        ? "hsl(var(--primary) / 0.15)"
-                        : "hsl(var(--muted))",
-                    color:
-                      theme === t
-                        ? "hsl(var(--primary))"
-                        : "hsl(var(--muted-foreground))",
                   }}
                 >
-                  {t === "dark" ? "Giza" : t === "light" ? "Mwanga" : "Dhahabu"}
+                  {t === "dark"
+                    ? "🌙 Dark"
+                    : t === "light"
+                      ? "☀️ Light"
+                      : "✨ Gold"}
                 </button>
               ))}
             </div>
@@ -187,22 +207,19 @@ export function ProfileSetup() {
 
           <Button
             onClick={submit}
-            disabled={register.isPending || updatePicture.isPending}
+            disabled={register.isPending}
+            className="w-full font-semibold py-5 rounded-xl"
             data-ocid="profile_setup.submit.primary_button"
-            className="w-full font-semibold"
             style={{
-              background: "hsl(var(--primary))",
-              color: "hsl(var(--primary-foreground))",
+              background: "linear-gradient(135deg, #C2185B, #FF00AA)",
+              color: "#fff",
+              border: "none",
             }}
           >
             {register.isPending ? (
-              <>
-                <Loader2 size={16} className="mr-2 animate-spin" />
-                Inahifadhi...
-              </>
-            ) : (
-              "Anza Sasa"
-            )}
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            {register.isPending ? "Inasajili..." : "Endelea / Continue"}
           </Button>
         </div>
       </div>

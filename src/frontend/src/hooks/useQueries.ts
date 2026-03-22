@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  AppSettings,
   Notification,
   Order,
+  PaymentReference,
   Product,
   Shop,
   UserProfile,
@@ -16,6 +18,18 @@ export function useAllShops() {
     queryFn: async () => {
       if (!actor) return [];
       return actor.getAllShops();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useActiveShops() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Shop[]>({
+    queryKey: ["activeShops"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getActiveShops();
     },
     enabled: !!actor && !isFetching,
   });
@@ -91,6 +105,54 @@ export function useMyProfile() {
       return actor.getMyProfile();
     },
     enabled: !!actor && !isFetching,
+  });
+}
+
+export function useIsAdmin() {
+  const { actor, isFetching } = useActor();
+  return useQuery<boolean>({
+    queryKey: ["isAdmin"],
+    queryFn: async () => {
+      if (!actor) return false;
+      return actor.isCallerAdmin();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAppSettings() {
+  const { actor, isFetching } = useActor();
+  return useQuery<AppSettings | null>({
+    queryKey: ["appSettings"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getAppSettings();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function usePendingReferences() {
+  const { actor, isFetching } = useActor();
+  return useQuery<PaymentReference[]>({
+    queryKey: ["pendingReferences"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getPendingReferences();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useMyReferences(shopId: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<PaymentReference[]>({
+    queryKey: ["myReferences", shopId?.toString()],
+    queryFn: async () => {
+      if (!actor || shopId === null) return [];
+      return actor.getMyReferences(shopId);
+    },
+    enabled: !!actor && !isFetching && shopId !== null,
   });
 }
 
@@ -385,12 +447,102 @@ export function useRegisterProfile() {
   return useMutation({
     mutationFn: async ({
       name,
+      phone,
       email,
       theme,
-    }: { name: string; email: string; theme: string }) => {
+    }: { name: string; phone: string; email: string; theme: string }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.registerProfile(name, email, theme);
+      return actor.registerProfile(name, phone, email, theme);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["myProfile"] }),
+  });
+}
+
+export function useDeleteProduct() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (productId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deleteProduct(productId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["shopProducts"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+}
+
+export function useSubmitSubscriptionReference() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      shopId,
+      referenceNumber,
+    }: { shopId: bigint; referenceNumber: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.submitSubscriptionReference(shopId, referenceNumber);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["myReferences"] });
+      qc.invalidateQueries({ queryKey: ["pendingReferences"] });
+    },
+  });
+}
+
+export function useUpdateAppSettings() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (platformPaymentNumber: string) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.updateAppSettings(platformPaymentNumber);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["appSettings"] }),
+  });
+}
+
+export function useApproveSubscriptionReference() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (referenceId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.approveSubscriptionReference(referenceId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pendingReferences"] });
+      qc.invalidateQueries({ queryKey: ["shops"] });
+      qc.invalidateQueries({ queryKey: ["activeShops"] });
+    },
+  });
+}
+
+export function useRejectSubscriptionReference() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (referenceId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.rejectSubscriptionReference(referenceId);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pendingReferences"] }),
+  });
+}
+
+export function useToggleShopAvailability() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (shopId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).toggleShopAvailability(shopId) as Promise<boolean>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["shops"] });
+      qc.invalidateQueries({ queryKey: ["activeShops"] });
+    },
   });
 }

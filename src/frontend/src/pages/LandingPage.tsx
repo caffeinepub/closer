@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { MapPin, ShoppingBag, Star } from "lucide-react";
+import { useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 export function LandingPage() {
@@ -79,7 +80,7 @@ export function LandingPage() {
       </div>
 
       {/* Features */}
-      <div className="px-6 pb-12 grid grid-cols-3 gap-4 max-w-sm mx-auto w-full">
+      <div className="px-6 pb-6 grid grid-cols-3 gap-4 max-w-sm mx-auto w-full">
         {[
           { icon: MapPin, label: "Maduka karibu" },
           { icon: ShoppingBag, label: "Agiza haraka" },

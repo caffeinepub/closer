@@ -108,6 +108,12 @@ function OrderCard({
           >
             {shopName}
           </p>
+          {(order.customerName || order.customerPhone) && (
+            <p className="text-xs mt-0.5" style={{ color: "hsl(200,70%,60%)" }}>
+              ud83dudccc {order.customerName}
+              {order.customerPhone ? ` u2022 ${order.customerPhone}` : ""}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1" style={{ color: cfg.color }}>
           <Icon size={14} />
