@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Bell,
@@ -475,8 +476,12 @@ export function ShopOwnerDashboard() {
     () => localStorage.getItem("notif_sound") || "beep",
   );
   const { actor } = useActor();
+  const qc = useQueryClient();
   const [adminSecretInput, setAdminSecretInput] = useState("");
   const [claimingAdmin, setClaimingAdmin] = useState(false);
+  const [showForceResetInput, setShowForceResetInput] = useState(false);
+  const [forceResetSecret, setForceResetSecret] = useState("");
+  const [forceResetting, setForceResetting] = useState(false);
   const [isAdminClaimed, setIsAdminClaimed] = useState(false);
   const setNotifSound = (val: string) => {
     setNotifSoundState(val);
@@ -484,23 +489,41 @@ export function ShopOwnerDashboard() {
   };
 
   async function handleClaimAdmin() {
-    if (!actor || !adminSecretInput.trim()) return;
+    if (!actor) return;
     setClaimingAdmin(true);
     try {
-      await (actor as any)._initializeAccessControlWithSecret(
-        adminSecretInput.trim(),
-      );
-      const isNowAdmin = await (actor as any).isCallerAdmin();
-      if (isNowAdmin) {
+      // First try claimAdminIfNoneYet (works if no admin assigned yet)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const claimed = await (actor as any).claimAdminIfNoneYet();
+      if (claimed) {
         setIsAdminClaimed(true);
-        toast.success(
-          "Umepata haki za Admin! Reload app ili uone Admin Panel.",
+        await qc.invalidateQueries();
+        toast.success("✅ Umepata haki za Admin! Sasa una udhibiti kamili.", {
+          duration: 6000,
+        });
+        return;
+      }
+      // Fallback: try with secret token if provided
+      if (adminSecretInput.trim()) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (actor as any)._initializeAccessControlWithSecret(
+          adminSecretInput.trim(),
         );
+        const isNowAdmin = await (actor as any).isCallerAdmin();
+        if (isNowAdmin) {
+          setIsAdminClaimed(true);
+          await qc.invalidateQueries();
+          toast.success("✅ Umepata haki za Admin!", { duration: 6000 });
+        } else {
+          toast.error("Neno la siri si sahihi. Jaribu tena.");
+        }
       } else {
-        toast.error("Neno la siri si sahihi. Jaribu tena.");
+        toast.error(
+          "Mamlaka ya Admin yameshachukuliwa na mtumiaji mwingine. Wasiliana na msimamizi.",
+        );
       }
     } catch {
-      toast.error("Hitilafu - angalia neno la siri na ujaribu tena.");
+      toast.error("Hitilafu - jaribu tena.");
     } finally {
       setClaimingAdmin(false);
     }
@@ -1149,7 +1172,7 @@ export function ShopOwnerDashboard() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-2">
                     {(products || []).map((p, i) => (
                       <div
                         key={p.id.toString()}
@@ -1414,7 +1437,7 @@ export function ShopOwnerDashboard() {
                     {isAdminClaimed ? (
                       <div
                         style={{
-                          padding: "10px 16px",
+                          padding: "12px 16px",
                           background: "hsl(120,50%,40%)",
                           borderRadius: 8,
                           color: "#fff",
@@ -1427,49 +1450,268 @@ export function ShopOwnerDashboard() {
                         Admin Panel.
                       </div>
                     ) : (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <input
-                          type="password"
-                          placeholder="Neno la siri la admin..."
-                          value={adminSecretInput}
-                          onChange={(e) => setAdminSecretInput(e.target.value)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && handleClaimAdmin()
-                          }
-                          data-ocid="settings.admin_secret.input"
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 12,
+                        }}
+                      >
+                        {/* Primary: claim without secret */}
+                        <button
+                          type="button"
+                          onClick={handleClaimAdmin}
+                          disabled={claimingAdmin}
+                          data-ocid="settings.claim_admin_direct.button"
                           style={{
-                            flex: 1,
+                            padding: "14px 18px",
+                            background:
+                              "linear-gradient(135deg, #1565C0, #6A1B9A)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 10,
+                            cursor: claimingAdmin ? "not-allowed" : "pointer",
+                            fontWeight: 700,
+                            fontSize: 16,
+                            opacity: claimingAdmin ? 0.7 : 1,
+                            width: "100%",
+                          }}
+                        >
+                          {claimingAdmin
+                            ? "⏳ Inasubiri..."
+                            : "🛡️ Daka Admin (Bila Siri)"}
+                        </button>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "hsl(var(--muted-foreground))",
+                            textAlign: "center",
+                            margin: 0,
+                          }}
+                        >
+                          Bonyeza kitufe hicho -- kama hakuna admin mwingine
+                          bado, utapata haki moja kwa moja.
+                        </p>
+                        {/* Divider */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <div
+                            style={{
+                              flex: 1,
+                              height: 1,
+                              background: "hsl(var(--border))",
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "hsl(var(--muted-foreground))",
+                            }}
+                          >
+                            au kwa siri
+                          </span>
+                          <div
+                            style={{
+                              flex: 1,
+                              height: 1,
+                              background: "hsl(var(--border))",
+                            }}
+                          />
+                        </div>
+                        {/* Secondary: with secret */}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input
+                            type="password"
+                            placeholder="Neno la siri la admin..."
+                            value={adminSecretInput}
+                            onChange={(e) =>
+                              setAdminSecretInput(e.target.value)
+                            }
+                            onKeyDown={(e) =>
+                              e.key === "Enter" &&
+                              adminSecretInput.trim() &&
+                              handleClaimAdmin()
+                            }
+                            data-ocid="settings.admin_secret.input"
+                            style={{
+                              flex: 1,
+                              padding: "10px 14px",
+                              borderRadius: 8,
+                              border: "1px solid hsl(var(--border))",
+                              background: "hsl(var(--background))",
+                              color: "hsl(var(--foreground))",
+                              fontSize: 14,
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleClaimAdmin}
+                            disabled={claimingAdmin || !adminSecretInput.trim()}
+                            data-ocid="settings.claim_admin.button"
+                            style={{
+                              padding: "10px 18px",
+                              background:
+                                "linear-gradient(135deg, #1565C0, #6A1B9A)",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 8,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                              fontSize: 14,
+                              opacity:
+                                claimingAdmin || !adminSecretInput.trim()
+                                  ? 0.6
+                                  : 1,
+                            }}
+                          >
+                            {claimingAdmin ? "..." : "Ingia"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Force Reset Admin Section */}
+                  <div
+                    style={{
+                      marginTop: 20,
+                      padding: "16px",
+                      borderRadius: 10,
+                      border: "1px solid hsl(var(--destructive) / 0.3)",
+                      background: "hsl(var(--destructive) / 0.05)",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "hsl(var(--muted-foreground))",
+                        margin: "0 0 8px 0",
+                        textAlign: "center",
+                      }}
+                    >
+                      ⚠️ Tatizo la Admin? Tumia hii kama njia ya dharura
+                    </p>
+                    {!showForceResetInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowForceResetInput(true)}
+                        data-ocid="settings.force_reset_admin.button"
+                        style={{
+                          width: "100%",
+                          padding: "12px 18px",
+                          background: "hsl(var(--destructive))",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontWeight: 700,
+                          fontSize: 14,
+                        }}
+                      >
+                        🔴 Futa Admin wa Zamani &amp; Chukua Mamlaka
+                      </button>
+                    ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        <input
+                          type="text"
+                          placeholder="Ingiza neno la siri: ctm2026"
+                          value={forceResetSecret}
+                          onChange={(e) => setForceResetSecret(e.target.value)}
+                          data-ocid="settings.force_reset_secret.input"
+                          style={{
                             padding: "10px 14px",
                             borderRadius: 8,
-                            border: "1px solid hsl(var(--border))",
+                            border: "1px solid hsl(var(--destructive) / 0.5)",
                             background: "hsl(var(--background))",
                             color: "hsl(var(--foreground))",
                             fontSize: 14,
                           }}
                         />
-                        <button
-                          type="button"
-                          onClick={handleClaimAdmin}
-                          disabled={claimingAdmin || !adminSecretInput.trim()}
-                          data-ocid="settings.claim_admin.button"
-                          style={{
-                            padding: "10px 18px",
-                            background:
-                              "linear-gradient(135deg, #1565C0, #6A1B9A)",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 8,
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            fontSize: 14,
-                            opacity:
-                              claimingAdmin || !adminSecretInput.trim()
-                                ? 0.6
-                                : 1,
-                          }}
-                        >
-                          {claimingAdmin ? "..." : "Ingia"}
-                        </button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!forceResetSecret.trim()) return;
+                              setForceResetting(true);
+                              try {
+                                const result = await (
+                                  actor as any
+                                ).forceResetAndClaimAdmin(
+                                  forceResetSecret.trim(),
+                                );
+                                if (result) {
+                                  toast.success("✅ Umepata Mamlaka ya Admin!");
+                                  qc.invalidateQueries();
+                                  setTimeout(
+                                    () => window.location.reload(),
+                                    1000,
+                                  );
+                                } else {
+                                  toast.error("Neno la siri si sahihi");
+                                }
+                              } catch (_err) {
+                                toast.error("Hitilafu imetokea. Jaribu tena.");
+                              } finally {
+                                setForceResetting(false);
+                              }
+                            }}
+                            disabled={
+                              forceResetting || !forceResetSecret.trim()
+                            }
+                            data-ocid="settings.force_reset_admin.confirm_button"
+                            style={{
+                              flex: 1,
+                              padding: "10px 18px",
+                              background: "hsl(var(--destructive))",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 8,
+                              cursor:
+                                forceResetting || !forceResetSecret.trim()
+                                  ? "not-allowed"
+                                  : "pointer",
+                              fontWeight: 700,
+                              fontSize: 14,
+                              opacity:
+                                forceResetting || !forceResetSecret.trim()
+                                  ? 0.6
+                                  : 1,
+                            }}
+                          >
+                            {forceResetting ? "⏳..." : "✅ Thibitisha"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowForceResetInput(false);
+                              setForceResetSecret("");
+                            }}
+                            data-ocid="settings.force_reset_admin.cancel_button"
+                            style={{
+                              padding: "10px 14px",
+                              background: "hsl(var(--muted))",
+                              color: "hsl(var(--muted-foreground))",
+                              border: "none",
+                              borderRadius: 8,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                              fontSize: 14,
+                            }}
+                          >
+                            Ghairi
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1893,9 +2135,6 @@ function OrderRow({
           >
             Idadi: {Number(order.quantity)} • TZS{" "}
             {Number(order.totalPrice).toLocaleString()}
-          </p>
-          <p className="text-xs" style={{ color: "hsl(45,90%,55%)" }}>
-            Komisho: TZS {Number(order.commissionAmount).toLocaleString()}
           </p>
           {order.customerName && (
             <p

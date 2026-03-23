@@ -931,4 +931,41 @@ actor {
       };
     };
   };
+  // Allows anyone to claim admin if no admin has been assigned yet.
+  // Returns true if caller successfully became admin, false otherwise.
+  public shared ({ caller }) func claimAdminIfNoneYet() : async Bool {
+    if (caller.isAnonymous()) { return false };
+    if (accessControlState.adminAssigned) { return false };
+    accessControlState.userRoles.add(caller, #admin);
+    accessControlState.adminAssigned := true;
+    true
+  };
+
+  // Allows an existing admin to promote any user to admin.
+  public shared ({ caller }) func promoteUserToAdmin(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admin can promote users");
+    };
+    accessControlState.userRoles.add(user, #admin);
+  };
+
+  // Force reset admin and claim for caller. Protected by secret code "ctm2026".
+  // This clears all admin roles and makes the caller the new admin.
+  public shared ({ caller }) func forceResetAndClaimAdmin(secret : Text) : async Bool {
+    if (caller.isAnonymous()) { return false };
+    if (secret != "ctm2026") { return false };
+    // Remove all existing admin roles
+    for ((p, role) in accessControlState.userRoles.toArray().vals()) {
+      switch (role) {
+        case (#admin) { accessControlState.userRoles.remove(p) };
+        case (_) {};
+      };
+    };
+    // Reset admin assigned flag and set caller as admin
+    accessControlState.adminAssigned := false;
+    accessControlState.userRoles.add(caller, #admin);
+    accessControlState.adminAssigned := true;
+    true
+  };
+
 };

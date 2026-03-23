@@ -29,8 +29,6 @@ export default function AuthPage() {
   function handleConnect() {
     setPopupBlocked(false);
 
-    // Step 1: Open a blank popup SYNCHRONOUSLY in the click handler.
-    // Browsers allow this because we are directly inside a user gesture.
     const preOpened = window.open(
       "about:blank",
       "ii-login-window",
@@ -38,14 +36,10 @@ export default function AuthPage() {
     );
 
     if (!preOpened || preOpened.closed) {
-      // Browser blocked even our synchronous open — user must allow popups manually.
       setPopupBlocked(true);
       return;
     }
 
-    // Step 2: Temporarily replace window.open so that when auth-client calls it
-    // internally, it gets our already-opened window back instead of trying to
-    // open a second one (which would be blocked as non-user-gesture).
     const originalOpen = window.open.bind(window);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).open = (
@@ -53,21 +47,17 @@ export default function AuthPage() {
       _target?: string,
       _features?: string,
     ) => {
-      // Navigate our pre-opened window to the requested URL.
       if (url && preOpened && !preOpened.closed) {
         preOpened.location.href = url.toString();
       }
       return preOpened;
     };
 
-    // Step 3: Restore original window.open after a tick so only auth-client's
-    // immediate call is intercepted.
     setTimeout(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).open = originalOpen;
     }, 200);
 
-    // Step 4: Call the auth-client login — it will use our intercepted window.open.
     login();
   }
 
@@ -90,13 +80,14 @@ export default function AuthPage() {
         localStorage.setItem(`avatar_${principal}`, avatarPreview);
       }
 
-      // If admin secret provided, initialize access control first
-      if (adminSecret.trim()) {
-        try {
-          await actor._initializeAccessControlWithSecret(adminSecret.trim());
-        } catch {
-          // Admin secret may already be set or not matching — continue regardless
-        }
+      // ALWAYS initialize access control — this registers the user in the system.
+      // If adminSecret matches the platform token, user becomes admin.
+      // If not (or empty), user becomes a regular #user. Without this call,
+      // every subsequent backend call will fail with "User is not registered".
+      try {
+        await actor._initializeAccessControlWithSecret(adminSecret.trim());
+      } catch {
+        // Already registered or token mismatch — continue regardless
       }
 
       await actor.registerProfile(name.trim(), "", email.trim(), "dark");
@@ -108,18 +99,18 @@ export default function AuthPage() {
       if (profile) setProfile(profile);
       setIsAuthenticated(true);
       if (role === UserRole.admin) {
+        toast.success("Umesajiliwa kama Admin!");
         setPage("shop-owner");
       } else {
         setPage("customer");
       }
     } catch {
-      toast.error("Failed to save profile. Please try again.");
+      toast.error("Hitilafu ya kusajili. Jaribu tena.");
     } finally {
       setSaving(false);
     }
   }
 
-  // When II login succeeds, move to profile step
   if (loginStatus === "success" && step === "connect") {
     setStep("profile");
   }
@@ -300,11 +291,11 @@ export default function AuthPage() {
               </span>
             </p>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Display Name *</Label>
+              <Label htmlFor="name">Jina lako *</Label>
               <Input
                 id="name"
                 data-ocid="auth.name_input"
-                placeholder="e.g. John Doe"
+                placeholder="Mfano: John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
@@ -312,7 +303,7 @@ export default function AuthPage() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email (optional)</Label>
+              <Label htmlFor="email">Barua pepe (si lazima)</Label>
               <Input
                 id="email"
                 data-ocid="auth.email_input"
@@ -325,21 +316,20 @@ export default function AuthPage() {
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="adminSecret">
-                Neno la Siri (Admin tu) / Admin Secret (optional)
+                Neno la Siri la Admin (si lazima)
               </Label>
               <Input
                 id="adminSecret"
                 type="password"
                 data-ocid="auth.admin_secret_input"
-                placeholder="Admin secret key..."
+                placeholder="Ingiza hapa ukiwa admin..."
                 value={adminSecret}
                 onChange={(e) => setAdminSecret(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSaveProfile()}
                 className="rounded-xl"
               />
               <p className="text-xs text-muted-foreground">
-                Kama una neno la siri la admin, ingiza hapa / If you have the
-                admin secret, enter it here
+                Ukiwa admin, ingiza neno la siri hapa. Vinginevyo acha tupu.
               </p>
             </div>
             <Button
@@ -352,7 +342,7 @@ export default function AuthPage() {
               {saving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
-              {saving ? "Saving..." : "Enter Marketplace"}
+              {saving ? "Inaendelea..." : "Ingia Sokoni"}
             </Button>
           </div>
         )}
@@ -363,7 +353,7 @@ export default function AuthPage() {
           onClick={() => setPage("landing")}
           className="text-muted-foreground text-xs text-center hover:text-foreground transition-colors"
         >
-          ← Back to Home
+          ← Rudi Nyuma
         </button>
       </motion.div>
     </div>

@@ -1,11 +1,27 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { BottomNav, type Page } from "./components/BottomNav";
 import { ThemeProvider } from "./context/ThemeContext";
+import { useActor } from "./hooks/useActor";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { useIsAdmin, useMyProfile } from "./hooks/useQueries";
 import { LandingPage } from "./pages/LandingPage";
+
+// Extract admin token from URL hash once at module level
+const _hashMatch = window.location.hash.match(
+  /caffeineAdminToken=([a-f0-9A-F]+)/,
+);
+const ADMIN_TOKEN_FROM_URL: string | null = _hashMatch ? _hashMatch[1] : null;
+if (ADMIN_TOKEN_FROM_URL) {
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname + window.location.search,
+  );
+}
 
 const CustomerDashboard = lazy(() =>
   import("./pages/CustomerDashboard").then((m) => ({
@@ -47,9 +63,67 @@ function AppInner() {
   const isLoggedIn = !!identity;
   const [page, setPage] = useState<Page>("browser");
   const [mounted, setMounted] = useState<Set<Page>>(new Set(["browser"]));
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  const adminClaimDone = useRef(false);
 
   const { data: profile, isLoading: profileLoading } = useMyProfile();
   const { data: isAdmin } = useIsAdmin();
+
+  // Claim admin rights from URL token using the correct function name
+  useEffect(() => {
+    if (
+      !ADMIN_TOKEN_FROM_URL ||
+      !actor ||
+      !isLoggedIn ||
+      adminClaimDone.current
+    )
+      return;
+    adminClaimDone.current = true;
+    (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (actor as any)._initializeAccessControlWithSecret(
+          ADMIN_TOKEN_FROM_URL,
+        );
+        const nowAdmin = await actor.isCallerAdmin();
+        await qc.invalidateQueries();
+        if (nowAdmin) {
+          toast.success("✅ Umepata haki za Admin!", { duration: 6000 });
+        } else {
+          toast.info("Umesajiliwa kama mtumiaji wa kawaida.");
+        }
+      } catch (e) {
+        console.error("Admin claim error:", e);
+      }
+    })();
+  }, [actor, isLoggedIn, qc]);
+
+  // Auto-claim admin for existing registered users if no admin yet.
+  // Always verify from backend to avoid stale cache issues.
+  const autoClaimDone = useRef(false);
+  useEffect(() => {
+    if (!actor || !isLoggedIn || autoClaimDone.current) return;
+    autoClaimDone.current = true;
+    (async () => {
+      try {
+        // Always verify from backend directly to avoid stale cache issues
+        const alreadyAdmin = await actor.isCallerAdmin();
+        if (alreadyAdmin) {
+          await qc.invalidateQueries({ queryKey: ["isAdmin"] });
+          return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const claimed = await (actor as any).claimAdminIfNoneYet();
+        if (claimed) {
+          await qc.invalidateQueries();
+          toast.success("✅ Umepata haki za Admin!", { duration: 5000 });
+        }
+      } catch {
+        // not critical
+      }
+    })();
+  }, [actor, isLoggedIn, qc]);
 
   // Mount page on first visit, keep mounted forever after
   useEffect(() => {

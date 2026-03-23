@@ -137,7 +137,7 @@ export function LandingPage() {
             rel="noreferrer"
             style={{ color: "#E91E8C" }}
           >
-            caffeine.ai
+            Caffeine
           </a>
         </div>
       </footer>

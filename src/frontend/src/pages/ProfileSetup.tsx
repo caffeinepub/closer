@@ -2,15 +2,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Camera, Loader2, User } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Camera,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Lock,
+  User,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { type Theme, useTheme } from "../context/ThemeContext";
-import {
-  useMyProfile,
-  useRegisterProfile,
-  useUpdateProfilePicture,
-} from "../hooks/useQueries";
+import { useActor } from "../hooks/useActor";
+import { useMyProfile, useUpdateProfilePicture } from "../hooks/useQueries";
 
 export function ProfileSetup() {
   const [name, setName] = useState("");
@@ -18,11 +23,14 @@ export function ProfileSetup() {
   const [email, setEmail] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [showAdminSection, setShowAdminSection] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { theme, setTheme } = useTheme();
-  const register = useRegisterProfile();
   const updatePicture = useUpdateProfilePicture();
   const { data: existingProfile } = useMyProfile();
+  const { actor } = useActor();
+  const qc = useQueryClient();
 
   const existingPicUrl =
     existingProfile?.profilePicture?.getDirectURL?.() || null;
@@ -31,8 +39,7 @@ export function ProfileSetup() {
     const f = e.target.files?.[0];
     if (!f) return;
     setProfileFile(f);
-    const url = URL.createObjectURL(f);
-    setProfilePreview(url);
+    setProfilePreview(URL.createObjectURL(f));
   };
 
   const submit = async () => {
@@ -40,21 +47,84 @@ export function ProfileSetup() {
       toast.error("Jina linahitajika");
       return;
     }
-    register.mutate(
-      { name: name.trim(), phone: phone.trim(), email: email.trim(), theme },
-      {
-        onSuccess: async () => {
-          toast.success("Umesajiliwa!");
-          if (profileFile) {
-            updatePicture.mutate(profileFile, {
-              onSuccess: () => toast.success("Picha imehifadhiwa!"),
-              onError: () => toast.error("Picha haikuhifadhiwa"),
-            });
+    if (!actor) {
+      toast.error("Uunganisho umeshindwa -- jaribu tena");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Step 1: Register with access control.
+      // Wrapped in its own try-catch so if already registered, we continue.
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (actor as any)._initializeAccessControlWithSecret("");
+      } catch {
+        // Already registered or token mismatch -- continue with registration
+      }
+
+      // Step 2: Register user profile
+      await actor.registerProfile(
+        name.trim(),
+        phone.trim(),
+        email.trim(),
+        theme,
+      );
+
+      // Step 3: If admin section open, use forceResetAndClaimAdmin for guaranteed access
+      let isAdminNow = false;
+      if (showAdminSection) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const claimed = await (actor as any).forceResetAndClaimAdmin(
+            "ctm2026",
+          );
+          if (claimed) isAdminNow = true;
+        } catch {
+          // fall through to regular check
+        }
+      }
+
+      // Step 4: If not yet admin, check real status and try claimAdminIfNoneYet
+      if (!isAdminNow) {
+        isAdminNow = await actor.isCallerAdmin();
+        if (!isAdminNow) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const claimed = await (actor as any).claimAdminIfNoneYet();
+            if (claimed) isAdminNow = true;
+          } catch {
+            // not critical
           }
-        },
-        onError: () => toast.error("Hitilafu — jaribu tena"),
-      },
-    );
+        }
+      }
+
+      // Step 5: Upload profile picture if provided
+      if (profileFile) {
+        try {
+          await updatePicture.mutateAsync(profileFile);
+        } catch {
+          // non-critical
+        }
+      }
+
+      // Step 6: Refresh all data
+      await qc.invalidateQueries();
+
+      if (isAdminNow) {
+        toast.success("✅ Umesajiliwa kama Admin -- una udhibiti kamili!", {
+          duration: 6000,
+        });
+      } else {
+        toast.success("Umesajiliwa!");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Registration error:", msg);
+      toast.error(`Hitilafu ya usajili: ${msg}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const avatarSrc = profilePreview || existingPicUrl || undefined;
@@ -62,7 +132,7 @@ export function ProfileSetup() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-6"
+      className="min-h-screen flex flex-col items-center justify-center px-6 py-8"
       style={{ background: "hsl(var(--background))" }}
     >
       <div
@@ -118,7 +188,7 @@ export function ProfileSetup() {
             className="text-xs text-center"
             style={{ color: "hsl(var(--muted-foreground))" }}
           >
-            Complete your profile to continue
+            Mtumiaji wa kwanza kusajili atakuwa Admin wa mfumo
           </p>
         </div>
 
@@ -140,7 +210,7 @@ export function ProfileSetup() {
 
           <div>
             <Label htmlFor="phone" style={{ color: "hsl(var(--foreground))" }}>
-              Namba ya Simu / Phone Number *
+              Namba ya Simu / Phone Number
             </Label>
             <Input
               id="phone"
@@ -205,21 +275,74 @@ export function ProfileSetup() {
             </div>
           </div>
 
+          {/* Admin Section Toggle */}
+          <div
+            className="rounded-xl border overflow-hidden"
+            style={{ borderColor: "hsl(var(--border))" }}
+          >
+            <button
+              type="button"
+              data-ocid="profile_setup.admin.toggle"
+              onClick={() => setShowAdminSection((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-colors"
+              style={{
+                background: showAdminSection
+                  ? "hsl(var(--muted))"
+                  : "transparent",
+                color: "hsl(var(--muted-foreground))",
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <Lock size={14} />
+                <span>Ingia kama Admin / Become Admin</span>
+              </span>
+              {showAdminSection ? (
+                <ChevronUp size={14} />
+              ) : (
+                <ChevronDown size={14} />
+              )}
+            </button>
+
+            {showAdminSection && (
+              <div
+                className="px-4 pb-4 pt-2 space-y-2"
+                style={{ background: "hsl(var(--muted) / 0.4)" }}
+              >
+                <p
+                  className="text-xs leading-snug rounded-lg px-3 py-2"
+                  style={{
+                    background: "hsl(var(--muted))",
+                    color: "hsl(var(--foreground))",
+                    borderLeft: "3px solid #7c3aed",
+                  }}
+                >
+                  ✅ Ukibonyeza &ldquo;🛡️ Sajili kama Admin&rdquo;, utakuwa Admin
+                  wa mfumo moja kwa moja &mdash; hata kama Admin mwingine
+                  alikuwepo awali.
+                </p>
+              </div>
+            )}
+          </div>
+
           <Button
             onClick={submit}
-            disabled={register.isPending}
+            disabled={saving}
             className="w-full font-semibold py-5 rounded-xl"
             data-ocid="profile_setup.submit.primary_button"
             style={{
-              background: "linear-gradient(135deg, #C2185B, #FF00AA)",
+              background: showAdminSection
+                ? "linear-gradient(135deg, #4f1d96, #7c3aed)"
+                : "linear-gradient(135deg, #C2185B, #FF00AA)",
               color: "#fff",
               border: "none",
             }}
           >
-            {register.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            {register.isPending ? "Inasajili..." : "Endelea / Continue"}
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {saving
+              ? "Inasajili..."
+              : showAdminSection
+                ? "🛡️ Sajili kama Admin"
+                : "Endelea / Continue"}
           </Button>
         </div>
       </div>

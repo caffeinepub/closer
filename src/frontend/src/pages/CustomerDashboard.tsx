@@ -80,7 +80,6 @@ function OrderCard({
     );
   };
 
-  const commission = Number(order.commissionAmount);
   const total = Number(order.totalPrice);
   const needsPayment =
     order.paymentStatus !== "confirmed" && order.status !== "cancelled";
@@ -144,15 +143,6 @@ function OrderCard({
             style={{ color: "hsl(var(--foreground))" }}
           >
             TZS {total.toLocaleString()}
-          </p>
-        </div>
-        <div
-          className="rounded-lg p-2 text-center"
-          style={{ background: "hsl(var(--muted))" }}
-        >
-          <p style={{ color: "hsl(var(--muted-foreground))" }}>Komisho</p>
-          <p className="font-semibold" style={{ color: "hsl(45,90%,55%)" }}>
-            TZS {commission.toLocaleString()}
           </p>
         </div>
       </div>

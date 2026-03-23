@@ -404,13 +404,13 @@ function ShopModal({
             Bidhaa
           </h3>
           {isLoading ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {[1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-48 rounded-xl" />
               ))}
             </div>
           ) : products && products.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {products.map((p) => (
                 <ProductCard
                   key={p.id.toString()}
@@ -494,12 +494,6 @@ function ShopModal({
                 <span>Jumla:</span>
                 <span>
                   TZS {(Number(orderProduct.price) * qty).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Komisho (10%):</span>
-                <span>
-                  TZS {(Number(orderProduct.price) * qty * 0.1).toFixed(0)}
                 </span>
               </div>
             </div>
@@ -643,6 +637,7 @@ export function ShopBrowser() {
   }));
 
   const filtered = shopsWithDistance
+    .filter((s) => s.isAvailable !== false)
     .filter(
       (s) =>
         s.name.toLowerCase().includes(search.toLowerCase()) ||
