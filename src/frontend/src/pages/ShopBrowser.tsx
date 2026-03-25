@@ -20,11 +20,13 @@ import {
   Search,
   ShoppingCart,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Product, Shop } from "../backend";
+import { BUSINESS_CATEGORIES } from "../constants/categories";
 import {
   useActiveShops,
+  useActiveShopsByCategory,
   usePlaceOrder,
   useShopProducts,
 } from "../hooks/useQueries";
@@ -221,6 +223,23 @@ function ShopCard({
             <MapPin size={11} />
             <span className="text-xs truncate">{shop.address}</span>
           </div>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {(shop as any).category && (
+            <span
+              className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{
+                background: "hsl(var(--primary) / 0.1)",
+                color: "hsl(var(--primary))",
+              }}
+            >
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {BUSINESS_CATEGORIES.find((c) => c.id === (shop as any).category)
+                ?.emoji || "🏪"}{" "}
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {BUSINESS_CATEGORIES.find((c) => c.id === (shop as any).category)
+                ?.label || (shop as any).category}
+            </span>
+          )}
           {shop.description && (
             <p
               className="text-xs mt-1 line-clamp-1"
@@ -248,10 +267,6 @@ function ShopModal({
   const placeOrder = usePlaceOrder();
   const [orderProduct, setOrderProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
-  const [paymentInfo, setPaymentInfo] = useState<{
-    total: number;
-    paymentNumbers: string;
-  } | null>(null);
 
   const distance = userPos
     ? calcDistance(userPos.lat, userPos.lon, shop.latitude, shop.longitude)
@@ -264,8 +279,6 @@ function ShopModal({
       {
         onSuccess: () => {
           toast.success("Agizo limetumwa!");
-          const total = Number(orderProduct.price) * qty;
-          setPaymentInfo({ total, paymentNumbers: shop.paymentNumbers || "" });
           setOrderProduct(null);
         },
         onError: () => toast.error("Hitilafu — jaribu tena"),
@@ -368,31 +381,6 @@ function ShopModal({
               </a>
             )}
           </div>
-
-          {/* Payment numbers — visible to customers BEFORE placing order */}
-          {shop.paymentNumbers && (
-            <div
-              className="mt-2 p-3 rounded-xl border"
-              style={{
-                background: "hsl(142 50% 50% / 0.1)",
-                borderColor: "hsl(142 50% 50% / 0.4)",
-              }}
-              data-ocid="shop_modal.payment_numbers.panel"
-            >
-              <p
-                className="font-semibold text-sm mb-1"
-                style={{ color: "hsl(var(--foreground))" }}
-              >
-                💳 Namba za Malipo / Payment Numbers
-              </p>
-              <p
-                className="text-sm font-medium"
-                style={{ color: "hsl(var(--foreground))" }}
-              >
-                {shop.paymentNumbers}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Products */}
@@ -523,74 +511,20 @@ function ShopModal({
             </div>
           </div>
         )}
-
-        {/* Payment info after order placed */}
-        {paymentInfo && (
-          <div
-            className="mt-4 p-4 rounded-xl border"
-            style={{
-              background: "hsl(45 90% 55% / 0.08)",
-              borderColor: "hsl(45 90% 55% / 0.4)",
-            }}
-            data-ocid="order_confirm.payment.panel"
-          >
-            <p
-              className="font-bold text-sm mb-2"
-              style={{ color: "hsl(45,90%,40%)" }}
-            >
-              ✅ Agizo limewekwa! / Order placed!
-            </p>
-            <p
-              className="font-semibold text-sm mb-1"
-              style={{ color: "hsl(var(--foreground))" }}
-            >
-              💳 Lipa Hapa / Pay Here
-            </p>
-            {paymentInfo.paymentNumbers ? (
-              <p
-                className="text-sm font-medium mb-1"
-                style={{ color: "hsl(var(--foreground))" }}
-              >
-                {paymentInfo.paymentNumbers}
-              </p>
-            ) : (
-              <p
-                className="text-xs"
-                style={{ color: "hsl(var(--muted-foreground))" }}
-              >
-                Wasiliana na duka kwa maelezo ya malipo.
-              </p>
-            )}
-            <p
-              className="text-xs mt-1"
-              style={{ color: "hsl(var(--muted-foreground))" }}
-            >
-              Kiasi / Amount: TZS {paymentInfo.total.toLocaleString()}
-            </p>
-            <p
-              className="text-xs mt-2"
-              style={{ color: "hsl(var(--muted-foreground))" }}
-            >
-              Baada ya kulipa, nenda kwenye "Maagizo Yangu" kupakia uthibitisho.
-            </p>
-            <button
-              type="button"
-              onClick={() => setPaymentInfo(null)}
-              className="mt-2 text-xs underline"
-              style={{ color: "hsl(var(--muted-foreground))" }}
-              data-ocid="order_confirm.payment.close_button"
-            >
-              Funga / Close
-            </button>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
 }
 
 export function ShopBrowser() {
-  const { data: shops, isLoading } = useActiveShops();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { data: allActiveShops, isLoading: allLoading } = useActiveShops();
+  const { data: categoryShops, isLoading: catLoading } =
+    useActiveShopsByCategory(selectedCategory);
+
+  const shops = selectedCategory ? categoryShops : allActiveShops;
+  const isLoading = selectedCategory ? catLoading : allLoading;
+
   const [search, setSearch] = useState("");
   const [selectedShop, setSelectedShop] = useState<ShopWithDistance | null>(
     null,
@@ -600,6 +534,7 @@ export function ShopBrowser() {
   );
   const [_locationError, setLocationError] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
 
   const requestLocation = () => {
     if (!navigator.geolocation) {
@@ -689,6 +624,66 @@ export function ShopBrowser() {
           />
         </div>
 
+        {/* Category Filter Row */}
+        <div
+          ref={categoryScrollRef}
+          className="flex gap-2 mt-3 overflow-x-auto pb-1"
+          style={{ scrollbarWidth: "none" }}
+          data-ocid="browser.categories.panel"
+        >
+          {/* All button */}
+          <button
+            type="button"
+            onClick={() => setSelectedCategory(null)}
+            data-ocid="browser.category_all.toggle"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
+            style={{
+              background:
+                selectedCategory === null
+                  ? "hsl(var(--primary))"
+                  : "hsl(var(--muted))",
+              color:
+                selectedCategory === null
+                  ? "hsl(var(--primary-foreground))"
+                  : "hsl(var(--muted-foreground))",
+              borderColor:
+                selectedCategory === null
+                  ? "hsl(var(--primary))"
+                  : "hsl(var(--border))",
+            }}
+          >
+            🏪 Zote / All
+          </button>
+
+          {BUSINESS_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() =>
+                setSelectedCategory(selectedCategory === cat.id ? null : cat.id)
+              }
+              data-ocid={`browser.category_${cat.id}.toggle`}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
+              style={{
+                background:
+                  selectedCategory === cat.id
+                    ? "hsl(var(--primary))"
+                    : "hsl(var(--muted))",
+                color:
+                  selectedCategory === cat.id
+                    ? "hsl(var(--primary-foreground))"
+                    : "hsl(var(--muted-foreground))",
+                borderColor:
+                  selectedCategory === cat.id
+                    ? "hsl(var(--primary))"
+                    : "hsl(var(--border))",
+              }}
+            >
+              {cat.emoji} {cat.label.split(" / ")[0]}
+            </button>
+          ))}
+        </div>
+
         <div className="mt-2 flex items-center justify-between">
           {userPos ? (
             <div
@@ -723,6 +718,25 @@ export function ShopBrowser() {
               </Button>
             </div>
           )}
+
+          {selectedCategory && (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{
+                background: "hsl(var(--primary) / 0.12)",
+                color: "hsl(var(--primary))",
+              }}
+            >
+              {
+                BUSINESS_CATEGORIES.find((c) => c.id === selectedCategory)
+                  ?.emoji
+              }{" "}
+              {
+                BUSINESS_CATEGORIES.find((c) => c.id === selectedCategory)
+                  ?.label
+              }
+            </span>
+          )}
         </div>
       </div>
 
@@ -749,7 +763,9 @@ export function ShopBrowser() {
               className="mt-3 text-sm"
               style={{ color: "hsl(var(--muted-foreground))" }}
             >
-              Hakuna maduka yaliyopatikana
+              {selectedCategory
+                ? "Hakuna maduka katika aina hii"
+                : "Hakuna maduka yaliyopatikana"}
             </p>
           </div>
         ) : (

@@ -156,6 +156,45 @@ export function useMyReferences(shopId: bigint | null) {
   });
 }
 
+export function useAllOrdersAdmin() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Order[]>({
+    queryKey: ["allOrdersAdmin"],
+    queryFn: async () => {
+      if (!actor) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).getAllOrdersAdmin();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useShopsByCategory(category: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Shop[]>({
+    queryKey: ["shopsByCategory", category],
+    queryFn: async () => {
+      if (!actor || !category) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).getShopsByCategory(category);
+    },
+    enabled: !!actor && !isFetching && !!category,
+  });
+}
+
+export function useActiveShopsByCategory(category: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Shop[]>({
+    queryKey: ["activeShopsByCategory", category],
+    queryFn: async () => {
+      if (!actor || !category) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).getActiveShopsByCategory(category);
+    },
+    enabled: !!actor && !isFetching && !!category,
+  });
+}
+
 export function usePlaceOrder() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -187,9 +226,11 @@ export function useCreateShop() {
       whatsapp: string;
       instagram: string;
       facebook: string;
+      category: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.createShop(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).createShop(
         data.name,
         data.description,
         data.address,
@@ -199,6 +240,7 @@ export function useCreateShop() {
         data.whatsapp,
         data.instagram,
         data.facebook,
+        data.category,
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["shops"] }),
@@ -220,9 +262,11 @@ export function useUpdateShop() {
       whatsapp: string;
       instagram: string;
       facebook: string;
+      category: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateShop(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).updateShop(
         data.shopId,
         data.name,
         data.description,
@@ -233,6 +277,7 @@ export function useUpdateShop() {
         data.whatsapp,
         data.instagram,
         data.facebook,
+        data.category,
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["shops"] }),

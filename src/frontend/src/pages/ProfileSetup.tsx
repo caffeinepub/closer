@@ -3,14 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Camera,
-  ChevronDown,
-  ChevronUp,
-  Loader2,
-  Lock,
-  User,
-} from "lucide-react";
+import { Camera, ChevronDown, ChevronUp, Loader2, User } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { type Theme, useTheme } from "../context/ThemeContext";
@@ -54,16 +47,7 @@ export function ProfileSetup() {
 
     setSaving(true);
     try {
-      // Step 1: Register with access control.
-      // Wrapped in its own try-catch so if already registered, we continue.
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (actor as any)._initializeAccessControlWithSecret("");
-      } catch {
-        // Already registered or token mismatch -- continue with registration
-      }
-
-      // Step 2: Register user profile
+      // registerProfile auto-registers the user in access control.
       await actor.registerProfile(
         name.trim(),
         phone.trim(),
@@ -71,35 +55,29 @@ export function ProfileSetup() {
         theme,
       );
 
-      // Step 3: If admin section open, use forceResetAndClaimAdmin for guaranteed access
       let isAdminNow = false;
+
       if (showAdminSection) {
+        // User clicked "Ingia kama Admin" -- try claimAdminIfNoneYet first
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const claimed = await (actor as any).forceResetAndClaimAdmin(
-            "ctm2026",
-          );
+          const claimed = await (actor as any).claimAdminIfNoneYet();
           if (claimed) isAdminNow = true;
         } catch {
-          // fall through to regular check
+          // not critical, fall through
         }
       }
 
-      // Step 4: If not yet admin, check real status and try claimAdminIfNoneYet
       if (!isAdminNow) {
-        isAdminNow = await actor.isCallerAdmin();
-        if (!isAdminNow) {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const claimed = await (actor as any).claimAdminIfNoneYet();
-            if (claimed) isAdminNow = true;
-          } catch {
-            // not critical
-          }
+        // Check if we became admin (e.g. first user)
+        try {
+          isAdminNow = await actor.isCallerAdmin();
+        } catch {
+          // ignore
         }
       }
 
-      // Step 5: Upload profile picture if provided
+      // Upload profile picture if provided
       if (profileFile) {
         try {
           await updatePicture.mutateAsync(profileFile);
@@ -108,7 +86,6 @@ export function ProfileSetup() {
         }
       }
 
-      // Step 6: Refresh all data
       await qc.invalidateQueries();
 
       if (isAdminNow) {
@@ -116,12 +93,12 @@ export function ProfileSetup() {
           duration: 6000,
         });
       } else {
-        toast.success("Umesajiliwa!");
+        toast.success("✅ Umesajiliwa!");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Registration error:", msg);
-      toast.error(`Hitilafu ya usajili: ${msg}`);
+      toast.error("Hitilafu ya kusajili. Tafadhali jaribu tena.");
     } finally {
       setSaving(false);
     }
@@ -141,7 +118,6 @@ export function ProfileSetup() {
         data-ocid="profile_setup.panel"
       >
         <div className="flex flex-col items-center mb-6">
-          {/* Profile picture upload */}
           <div className="relative mb-4">
             <Avatar className="w-20 h-20">
               <AvatarImage src={avatarSrc} alt="Picha ya Wasifu" />
@@ -293,7 +269,7 @@ export function ProfileSetup() {
               }}
             >
               <span className="flex items-center gap-2">
-                <Lock size={14} />
+                <span>🛡️</span>
                 <span>Ingia kama Admin / Become Admin</span>
               </span>
               {showAdminSection ? (
@@ -316,9 +292,9 @@ export function ProfileSetup() {
                     borderLeft: "3px solid #7c3aed",
                   }}
                 >
-                  ✅ Ukibonyeza &ldquo;🛡️ Sajili kama Admin&rdquo;, utakuwa Admin
-                  wa mfumo moja kwa moja &mdash; hata kama Admin mwingine
-                  alikuwepo awali.
+                  ✅ Ukibonyeza &ldquo;🛡️ Sajili kama Admin&rdquo; mfumo
+                  utajaribu kukupa haki za Admin kama hakuna admin mwingine
+                  aliyesajiliwa &mdash; bila kuhitaji neno la siri lolote.
                 </p>
               </div>
             )}

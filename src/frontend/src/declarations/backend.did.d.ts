@@ -71,6 +71,7 @@ export interface Shop {
   'facebook' : string,
   'longitude' : number,
   'address' : string,
+  'category' : string,
 }
 export interface UserProfile {
   'name' : string,
@@ -117,7 +118,7 @@ export interface _SERVICE {
     bigint
   >,
   'createShop' : ActorMethod<
-    [string, string, string, number, number, string, string, string, string],
+    [string, string, string, number, number, string, string, string, string, string],
     bigint
   >,
   'deleteProduct' : ActorMethod<[bigint], undefined>,
@@ -125,7 +126,10 @@ export interface _SERVICE {
   'getActiveShops' : ActorMethod<[], Array<Shop>>,
   'getAllProducts' : ActorMethod<[], Array<Product>>,
   'getAllReferences' : ActorMethod<[], Array<PaymentReference>>,
+  'getAllOrdersAdmin' : ActorMethod<[], Array<Order>>,
   'getAllShops' : ActorMethod<[], Array<Shop>>,
+  'getShopsByCategory' : ActorMethod<[string], Array<Shop>>,
+  'getActiveShopsByCategory' : ActorMethod<[string], Array<Shop>>,
   'getAllUserProfiles' : ActorMethod<[], Array<[Principal, UserProfile]>>,
   'getAppSettings' : ActorMethod<[], AppSettings>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
@@ -164,6 +168,7 @@ export interface _SERVICE {
       string,
       number,
       number,
+      string,
       string,
       string,
       string,

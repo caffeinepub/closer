@@ -1,25 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  CheckCircle,
-  ClipboardList,
-  Clock,
-  MessageSquare,
-  Upload,
-  XCircle,
-} from "lucide-react";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
-import type { Order, Shop } from "../backend";
-import {
-  useAllProducts,
-  useAllShops,
-  useMyOrders,
-  useUpdatePaymentNote,
-  useUpdatePaymentProof,
-} from "../hooks/useQueries";
+import { CheckCircle, ClipboardList, Clock, XCircle } from "lucide-react";
+import type { Order } from "../backend";
+import { useAllProducts, useAllShops, useMyOrders } from "../hooks/useQueries";
 
 const STATUS_CONFIG: Record<
   string,
@@ -43,47 +26,10 @@ function OrderCard({
   order,
   shopName,
   productName,
-  shop,
-}: { order: Order; shopName: string; productName: string; shop?: Shop }) {
-  const uploadProof = useUpdatePaymentProof();
-  const updateNote = useUpdatePaymentNote();
-  const fileRef = useRef<HTMLInputElement>(null);
+}: { order: Order; shopName: string; productName: string }) {
   const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const Icon = cfg.icon;
-  const [noteText, setNoteText] = useState("");
-  const [showNoteInput, setShowNoteInput] = useState(false);
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    uploadProof.mutate(
-      { orderId: order.id, file, paymentNote: "" },
-      {
-        onSuccess: () => toast.success("Uthibitisho umepakiwa!"),
-        onError: () => toast.error("Hitilafu — jaribu tena"),
-      },
-    );
-  };
-
-  const handleNoteSubmit = () => {
-    if (!noteText.trim()) return;
-    updateNote.mutate(
-      { orderId: order.id, paymentNote: noteText.trim() },
-      {
-        onSuccess: () => {
-          toast.success("Ujumbe wako umehifadhiwa!");
-          setNoteText("");
-          setShowNoteInput(false);
-        },
-        onError: () => toast.error("Hitilafu — jaribu tena"),
-      },
-    );
-  };
-
   const total = Number(order.totalPrice);
-  const needsPayment =
-    order.paymentStatus !== "confirmed" && order.status !== "cancelled";
-  const isPending = uploadProof.isPending || updateNote.isPending;
 
   return (
     <div
@@ -107,12 +53,6 @@ function OrderCard({
           >
             {shopName}
           </p>
-          {(order.customerName || order.customerPhone) && (
-            <p className="text-xs mt-0.5" style={{ color: "hsl(200,70%,60%)" }}>
-              ud83dudccc {order.customerName}
-              {order.customerPhone ? ` u2022 ${order.customerPhone}` : ""}
-            </p>
-          )}
         </div>
         <div className="flex items-center gap-1" style={{ color: cfg.color }}>
           <Icon size={14} />
@@ -120,7 +60,7 @@ function OrderCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-xs">
         <div
           className="rounded-lg p-2 text-center"
           style={{ background: "hsl(var(--muted))" }}
@@ -147,133 +87,6 @@ function OrderCard({
         </div>
       </div>
 
-      {/* Payment section - show when payment not confirmed */}
-      {needsPayment && (
-        <div
-          className="rounded-xl p-3 space-y-3 border"
-          style={{
-            background: "hsl(45,90%,55% / 0.08)",
-            borderColor: "hsl(45,90%,55% / 0.3)",
-          }}
-          data-ocid="orders.payment.panel"
-        >
-          {/* Payment numbers from shop */}
-          {shop?.paymentNumbers && (
-            <div>
-              <p
-                className="text-xs font-bold mb-1"
-                style={{ color: "hsl(45,90%,45%)" }}
-              >
-                💳 Lipa Hapa / Pay Here
-              </p>
-              <p
-                className="text-sm font-semibold"
-                style={{ color: "hsl(var(--foreground))" }}
-              >
-                {shop.paymentNumbers}
-              </p>
-              <p
-                className="text-xs mt-1"
-                style={{ color: "hsl(var(--muted-foreground))" }}
-              >
-                Kiasi: TZS {total.toLocaleString()}
-              </p>
-            </div>
-          )}
-
-          {/* Proof status */}
-          {order.paymentProof ? (
-            <p className="text-xs" style={{ color: "hsl(120,50%,45%)" }}>
-              ✓ Uthibitisho wa picha umepakiwa
-            </p>
-          ) : null}
-          {order.paymentNote ? (
-            <p
-              className="text-xs rounded-lg px-2 py-1"
-              style={{
-                background: "hsl(var(--muted))",
-                color: "hsl(var(--foreground))",
-              }}
-            >
-              <span style={{ color: "hsl(var(--muted-foreground))" }}>
-                Ujumbe:{" "}
-              </span>
-              {order.paymentNote}
-            </p>
-          ) : null}
-
-          {/* Upload image */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFile}
-          />
-
-          {!showNoteInput ? (
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileRef.current?.click()}
-                disabled={isPending}
-                data-ocid="orders.upload.upload_button"
-                className="flex-1 text-xs"
-              >
-                <Upload size={13} className="mr-1" />
-                Pakia Picha
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowNoteInput(true)}
-                data-ocid="orders.note.secondary_button"
-                className="flex-1 text-xs"
-              >
-                <MessageSquare size={13} className="mr-1" />
-                Andika Ujumbe
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Textarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                placeholder="Mfano: Nilituma TZS 5,000 via M-Pesa ref: ABC123"
-                rows={2}
-                className="text-xs"
-                data-ocid="orders.note.textarea"
-              />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowNoteInput(false)}
-                  data-ocid="orders.note.cancel_button"
-                  className="flex-1 text-xs"
-                >
-                  Ghairi
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleNoteSubmit}
-                  disabled={isPending || !noteText.trim()}
-                  data-ocid="orders.note.submit_button"
-                  className="flex-1 text-xs"
-                  style={{
-                    background: "hsl(var(--primary))",
-                    color: "hsl(var(--primary-foreground))",
-                  }}
-                >
-                  {updateNote.isPending ? "Inatuma..." : "Tuma Ujumbe"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Payment confirmed badge */}
       {order.paymentStatus === "confirmed" && (
         <div
@@ -296,9 +109,8 @@ export function CustomerDashboard() {
   const { data: shops } = useAllShops();
   const { data: products } = useAllProducts();
 
-  const getShop = (shopId: bigint) => shops?.find((s) => s.id === shopId);
   const getShopName = (shopId: bigint) =>
-    getShop(shopId)?.name || `Duka #${shopId}`;
+    shops?.find((s) => s.id === shopId)?.name || `Duka #${shopId}`;
   const getProductName = (productId: bigint) =>
     products?.find((p) => p.id === productId)?.name || `Bidhaa #${productId}`;
 
@@ -378,7 +190,6 @@ export function CustomerDashboard() {
                       order={o}
                       shopName={getShopName(o.shopId)}
                       productName={getProductName(o.productId)}
-                      shop={getShop(o.shopId)}
                     />
                   ))}
                 </div>
@@ -399,7 +210,6 @@ export function CustomerDashboard() {
                       order={o}
                       shopName={getShopName(o.shopId)}
                       productName={getProductName(o.productId)}
-                      shop={getShop(o.shopId)}
                     />
                   ))}
                 </div>
@@ -420,7 +230,6 @@ export function CustomerDashboard() {
                       order={o}
                       shopName={getShopName(o.shopId)}
                       productName={getProductName(o.productId)}
-                      shop={getShop(o.shopId)}
                     />
                   ))}
                 </div>

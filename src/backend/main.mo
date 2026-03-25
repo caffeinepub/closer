@@ -58,7 +58,6 @@ actor {
     platformPaymentNumber : Text;
   };
 
-  // Core shop type stored in stable Map (unchanged from previous version)
   public type Shop = {
     id : Nat;
     name : Text;
@@ -77,7 +76,6 @@ actor {
     isActive : Bool;
   };
 
-  // Extended type returned to frontend (includes availability)
   public type ShopWithAvailability = {
     id : Nat;
     name : Text;
@@ -95,6 +93,7 @@ actor {
     subscriptionExpiry : Int;
     isActive : Bool;
     isAvailable : Bool;
+    category : Text;
   };
 
   public type Product = {
@@ -152,7 +151,8 @@ actor {
 
   let userProfiles = Map.empty<Principal, UserProfile>();
   let shops = Map.empty<Nat, Shop>();
-  let shopAvailability = Map.empty<Nat, Bool>(); // separate stable map for availability
+  let shopAvailability = Map.empty<Nat, Bool>();
+  let shopCategories = Map.empty<Nat, Text>();
   let products = Map.empty<Nat, Product>();
   let orders = Map.empty<Nat, Order>();
   let notifications = Map.empty<Nat, Notification>();
@@ -160,6 +160,20 @@ actor {
 
   var appSettings : AppSettings = {
     platformPaymentNumber = "16334291";
+  };
+
+  // Helper: ensure caller is registered in access control.
+  // First-ever caller becomes admin; subsequent callers become regular users.
+  func ensureRegistered(caller : Principal) {
+    if (caller.isAnonymous()) { Runtime.trap("Anonymous users cannot register") };
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      if (not accessControlState.adminAssigned) {
+        accessControlState.userRoles.add(caller, #admin);
+        accessControlState.adminAssigned := true;
+      } else {
+        accessControlState.userRoles.add(caller, #user);
+      };
+    };
   };
 
   func withAvailability(shop : Shop) : ShopWithAvailability {
@@ -184,6 +198,7 @@ actor {
       subscriptionExpiry = shop.subscriptionExpiry;
       isActive = shop.isActive;
       isAvailable = avail;
+      category = switch (shopCategories.get(shop.id)) { case (null) { "" }; case (?c) { c } };
     };
   };
 
@@ -209,16 +224,15 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
+    ensureRegistered(caller);
     userProfiles.add(caller, profile);
   };
 
+  // registerProfile now auto-registers the caller in access control.
+  // No separate _initializeAccessControlWithSecret call is needed.
+  // First caller becomes admin; all others become regular users.
   public shared ({ caller }) func registerProfile(name : Text, phone : Text, email : Text, preferredTheme : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can register profiles");
-    };
+    ensureRegistered(caller);
     let profile : UserProfile = {
       name;
       phone;
@@ -268,7 +282,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func createShop(name : Text, description : Text, address : Text, latitude : Float, longitude : Float, tiktok : Text, whatsapp : Text, instagram : Text, facebook : Text) : async Nat {
+  public shared ({ caller }) func createShop(name : Text, description : Text, address : Text, latitude : Float, longitude : Float, tiktok : Text, whatsapp : Text, instagram : Text, facebook : Text, category : Text) : async Nat {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can create shops");
     };
@@ -287,10 +301,11 @@ actor {
       logo = null;
       paymentNumbers = "";
       subscriptionExpiry = 0;
-      isActive = false;
+      isActive = true;
     };
     shops.add(nextShopId, shop);
     shopAvailability.add(nextShopId, true);
+    shopCategories.add(nextShopId, category);
     let shopId = nextShopId;
     nextShopId += 1;
     shopId;
@@ -381,7 +396,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func updateShop(shopId : Nat, name : Text, description : Text, address : Text, latitude : Float, longitude : Float, tiktok : Text, whatsapp : Text, instagram : Text, facebook : Text) : async () {
+  public shared ({ caller }) func updateShop(shopId : Nat, name : Text, description : Text, address : Text, latitude : Float, longitude : Float, tiktok : Text, whatsapp : Text, instagram : Text, facebook : Text, category : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can update shops");
     };
@@ -409,6 +424,7 @@ actor {
           isActive = shop.isActive;
         };
         shops.add(shopId, updatedShop);
+        shopCategories.add(shopId, category);
       };
     };
   };
@@ -518,7 +534,7 @@ actor {
           Runtime.trap("Insufficient stock");
         };
         let totalPrice = product.price * quantity;
-        let commissionAmount = totalPrice / 10;
+        let commissionAmount : Nat = 0;
         switch (userProfiles.get(caller)) {
           case (null) { Runtime.trap("User profile does not exist") };
           case (?userProfile) {
@@ -711,6 +727,22 @@ actor {
         orders.values().toArray().filter(func(order) { order.shopId == shopId }).sort(func(a, b) { Nat.compare(a.id, b.id) });
       };
     };
+  };
+
+  public query ({ caller }) func getAllOrdersAdmin() : async [Order] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can view all orders");
+    };
+    orders.values().toArray().sort(func(a, b) { Nat.compare(a.id, b.id) });
+  };
+
+
+  public query ({ caller }) func getShopsByCategory(category : Text) : async [ShopWithAvailability] {
+    shops.values().toArray().filter(func(shop) { switch (shopCategories.get(shop.id)) { case (?c) { c == category }; case (null) { false } } }).map(withAvailability);
+  };
+
+  public query ({ caller }) func getActiveShopsByCategory(category : Text) : async [ShopWithAvailability] {
+    shops.values().toArray().filter(func(shop) { shop.isActive and (switch (shopCategories.get(shop.id)) { case (?c) { c == category }; case (null) { false } }) }).map(withAvailability);
   };
 
   public query ({ caller }) func getAllShops() : async [ShopWithAvailability] {
@@ -931,8 +963,8 @@ actor {
       };
     };
   };
+
   // Allows anyone to claim admin if no admin has been assigned yet.
-  // Returns true if caller successfully became admin, false otherwise.
   public shared ({ caller }) func claimAdminIfNoneYet() : async Bool {
     if (caller.isAnonymous()) { return false };
     if (accessControlState.adminAssigned) { return false };
@@ -950,22 +982,20 @@ actor {
   };
 
   // Force reset admin and claim for caller. Protected by secret code "ctm2026".
-  // This clears all admin roles and makes the caller the new admin.
   public shared ({ caller }) func forceResetAndClaimAdmin(secret : Text) : async Bool {
     if (caller.isAnonymous()) { return false };
     if (secret != "ctm2026") { return false };
-    // Remove all existing admin roles
     for ((p, role) in accessControlState.userRoles.toArray().vals()) {
       switch (role) {
         case (#admin) { accessControlState.userRoles.remove(p) };
         case (_) {};
       };
     };
-    // Reset admin assigned flag and set caller as admin
     accessControlState.adminAssigned := false;
     accessControlState.userRoles.add(caller, #admin);
     accessControlState.adminAssigned := true;
     true
   };
+
 
 };

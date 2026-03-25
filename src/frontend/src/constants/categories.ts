@@ -1,0 +1,69 @@
+export const BUSINESS_CATEGORIES = [
+  {
+    id: "soko",
+    label: "Soko / Market",
+    emoji: "🛒",
+    labelEn: "Market Vendors",
+  },
+  {
+    id: "chakula",
+    label: "Chakula / Food",
+    emoji: "🍔",
+    labelEn: "Food & Restaurants",
+  },
+  { id: "chips", label: "Chipsi / Chips", emoji: "🍟", labelEn: "Chips Shops" },
+  {
+    id: "nyama_choma",
+    label: "Nyama Choma / Grill",
+    emoji: "🔥",
+    labelEn: "Grill & BBQ",
+  },
+  {
+    id: "nguo",
+    label: "Nguo / Clothing",
+    emoji: "👗",
+    labelEn: "Clothing & Fashion",
+  },
+  {
+    id: "dawa",
+    label: "Dawa / Pharmacy",
+    emoji: "💊",
+    labelEn: "Pharmacy & Health",
+  },
+  {
+    id: "elektroniki",
+    label: "Elektroniki / Electronics",
+    emoji: "📱",
+    labelEn: "Electronics",
+  },
+  {
+    id: "kilimo",
+    label: "Kilimo / Agriculture",
+    emoji: "🌾",
+    labelEn: "Agriculture & Farming",
+  },
+  {
+    id: "usafi",
+    label: "Usafi / Cleaning",
+    emoji: "🧹",
+    labelEn: "Cleaning Services",
+  },
+  {
+    id: "ujenzi",
+    label: "Ujenzi / Construction",
+    emoji: "🏗️",
+    labelEn: "Construction & Hardware",
+  },
+  {
+    id: "saluni",
+    label: "Saluni / Salon",
+    emoji: "💇",
+    labelEn: "Salon & Beauty",
+  },
+  {
+    id: "nyingine",
+    label: "Nyingine / Other",
+    emoji: "🏪",
+    labelEn: "Other Businesses",
+  },
+];

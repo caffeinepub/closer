@@ -3,40 +3,115 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  CheckCircle,
-  Loader2,
-  RefreshCw,
-  Settings,
-  XCircle,
-} from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, RefreshCw, Settings, ShoppingBag } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { Order } from "../backend";
 import {
+  useAllOrdersAdmin,
   useAppSettings,
-  useApproveSubscriptionReference,
-  usePendingReferences,
-  useRejectSubscriptionReference,
   useUpdateAppSettings,
 } from "../hooks/useQueries";
 
-function formatDate(nanos: bigint): string {
-  const ms = Number(nanos / BigInt(1_000_000));
-  return new Date(ms).toLocaleDateString("sw-TZ", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatTZS(amount: bigint | number): string {
+  return `TZS ${Number(amount).toLocaleString()}`;
+}
+
+function PaymentStatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  if (s === "paid" || s === "imelipwa") {
+    return (
+      <Badge
+        style={{ background: "hsl(142,50%,40%)", color: "#fff" }}
+        data-ocid="admin.transaction.paid_status"
+      >
+        ✅ Imelipwa
+      </Badge>
+    );
+  }
+  if (s === "pending" || s === "inasubiri") {
+    return (
+      <Badge
+        style={{ background: "hsl(45,90%,45%)", color: "#fff" }}
+        data-ocid="admin.transaction.pending_status"
+      >
+        ⏳ Inasubiri
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      style={{
+        background: "hsl(var(--muted))",
+        color: "hsl(var(--muted-foreground))",
+      }}
+      data-ocid="admin.transaction.unpaid_status"
+    >
+      ❌ Haijalipiwa
+    </Badge>
+  );
+}
+
+function TransactionRow({ order, idx }: { order: Order; idx: number }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const customerName = (order as any).customerName || "";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const customerPhone = (order as any).customerPhone || "";
+
+  return (
+    <div
+      className="rounded-xl border p-3 space-y-2"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--border))",
+      }}
+      data-ocid={`admin.transaction.item.${idx + 1}`}
+    >
+      {/* Customer info */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p
+            className="font-semibold text-sm truncate"
+            style={{ color: "hsl(var(--foreground))" }}
+          >
+            👤 {customerName || "(Jina halijawekwa)"}
+          </p>
+          {customerPhone && (
+            <p
+              className="text-xs"
+              style={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              📞 {customerPhone}
+            </p>
+          )}
+        </div>
+        <PaymentStatusBadge status={order.status} />
+      </div>
+
+      {/* Order details */}
+      <div
+        className="flex items-center justify-between text-xs"
+        style={{ color: "hsl(var(--muted-foreground))" }}
+      >
+        <span>Agizo #{order.id.toString()}</span>
+        <span
+          className="font-bold text-sm"
+          style={{ color: "hsl(var(--primary))" }}
+        >
+          {formatTZS(order.totalPrice)}
+        </span>
+      </div>
+
+      {/* Order quantity */}
+      <div
+        className="text-xs"
+        style={{ color: "hsl(var(--muted-foreground))" }}
+      >
+        Idadi: {Number(order.quantity)}
+      </div>
+    </div>
+  );
 }
 
 export function AdminPanel() {
@@ -46,13 +121,11 @@ export function AdminPanel() {
     refetch: refetchSettings,
   } = useAppSettings();
   const {
-    data: pendingRefs,
-    isLoading: refsLoading,
-    refetch: refetchRefs,
-  } = usePendingReferences();
+    data: allOrders,
+    isLoading: ordersLoading,
+    refetch: refetchOrders,
+  } = useAllOrdersAdmin();
   const updateSettings = useUpdateAppSettings();
-  const approve = useApproveSubscriptionReference();
-  const reject = useRejectSubscriptionReference();
 
   const [paymentNumber, setPaymentNumber] = useState("");
   const [editingPayment, setEditingPayment] = useState(false);
@@ -67,26 +140,6 @@ export function AdminPanel() {
         toast.success("Mipangilio imehifadhiwa!");
         setEditingPayment(false);
         refetchSettings();
-      },
-      onError: () => toast.error("Hitilafu — jaribu tena"),
-    });
-  };
-
-  const handleApprove = (id: bigint) => {
-    approve.mutate(id, {
-      onSuccess: () => {
-        toast.success("Imeidhinishwa!");
-        refetchRefs();
-      },
-      onError: () => toast.error("Hitilafu — jaribu tena"),
-    });
-  };
-
-  const handleReject = (id: bigint) => {
-    reject.mutate(id, {
-      onSuccess: () => {
-        toast.success("Imekataliwa");
-        refetchRefs();
       },
       onError: () => toast.error("Hitilafu — jaribu tena"),
     });
@@ -113,241 +166,204 @@ export function AdminPanel() {
         </p>
       </div>
 
-      {/* App Settings */}
-      <div className="px-4 mb-6">
-        <div
-          className="rounded-2xl p-4 border"
-          style={{
-            background: "hsl(var(--card))",
-            borderColor: "hsl(var(--border))",
-          }}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Settings size={18} style={{ color: "hsl(var(--primary))" }} />
-            <h2
-              className="font-bold text-base"
-              style={{ color: "hsl(var(--foreground))" }}
-            >
-              Mipangilio ya App / App Settings
-            </h2>
-          </div>
-
-          {settingsLoading ? (
-            <Skeleton className="h-10 rounded-lg" />
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <Label style={{ color: "hsl(var(--foreground))" }}>
-                  Namba ya Malipo ya Platform / Platform Payment Number
-                </Label>
-                {editingPayment ? (
-                  <div className="flex gap-2 mt-1">
-                    <Input
-                      value={paymentNumber}
-                      onChange={(e) => setPaymentNumber(e.target.value)}
-                      placeholder="M-Pesa: +255700000000"
-                      className="flex-1"
-                      data-ocid="admin.payment_number.input"
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && handleSaveSettings()
-                      }
-                    />
-                    <Button
-                      onClick={handleSaveSettings}
-                      disabled={updateSettings.isPending}
-                      style={{
-                        background: "linear-gradient(135deg, #1565C0, #6A1B9A)",
-                        color: "#fff",
-                      }}
-                      data-ocid="admin.payment_number.save_button"
-                    >
-                      {updateSettings.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Hifadhi"
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setEditingPayment(false)}
-                      data-ocid="admin.payment_number.cancel_button"
-                    >
-                      Ghairi
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-1">
-                    <div
-                      className="flex-1 px-3 py-2 rounded-lg text-sm"
-                      style={{
-                        background: "hsl(var(--muted))",
-                        color: "hsl(var(--foreground))",
-                      }}
-                    >
-                      {settings?.platformPaymentNumber || "Haijawekwa bado"}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setPaymentNumber(settings?.platformPaymentNumber || "");
-                        setEditingPayment(true);
-                      }}
-                      data-ocid="admin.payment_number.edit_button"
-                    >
-                      Badilisha
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Pending References */}
       <div className="px-4">
-        <div
-          className="rounded-2xl border"
-          style={{
-            background: "hsl(var(--card))",
-            borderColor: "hsl(var(--border))",
-          }}
-        >
-          <div
-            className="flex items-center justify-between p-4 border-b"
-            style={{ borderColor: "hsl(var(--border))" }}
-          >
-            <div className="flex items-center gap-2">
-              <h2
-                className="font-bold text-base"
-                style={{ color: "hsl(var(--foreground))" }}
-              >
-                Malipo Yanayosubiri / Pending References
-              </h2>
-              {pendingRefs && pendingRefs.length > 0 && (
+        <Tabs defaultValue="transactions" data-ocid="admin.tabs">
+          <TabsList className="w-full mb-4">
+            <TabsTrigger
+              value="transactions"
+              className="flex-1 flex items-center gap-2"
+              data-ocid="admin.transactions.tab"
+            >
+              <ShoppingBag size={14} />
+              Maagizo
+              {allOrders && allOrders.length > 0 && (
                 <Badge
+                  className="ml-1 text-xs px-1.5 py-0 h-5"
                   style={{
-                    background: "hsl(0,70%,50%)",
-                    color: "#fff",
+                    background: "hsl(var(--primary))",
+                    color: "hsl(var(--primary-foreground))",
                   }}
-                  data-ocid="admin.pending_count.badge"
                 >
-                  {pendingRefs.length}
+                  {allOrders.length}
                 </Badge>
               )}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchRefs()}
-              data-ocid="admin.pending_refs.refresh_button"
+            </TabsTrigger>
+            <TabsTrigger
+              value="settings"
+              className="flex-1 flex items-center gap-2"
+              data-ocid="admin.settings.tab"
             >
-              <RefreshCw size={14} className="mr-1" />
-              Onyesha upya
-            </Button>
-          </div>
+              <Settings size={14} />
+              Mipangilio
+            </TabsTrigger>
+          </TabsList>
 
-          {refsLoading ? (
-            <div className="p-4 space-y-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 rounded-lg" />
-              ))}
-            </div>
-          ) : !pendingRefs || pendingRefs.length === 0 ? (
-            <div
-              className="text-center py-10"
-              data-ocid="admin.pending_refs.empty_state"
-            >
-              <CheckCircle
-                size={32}
-                className="mx-auto mb-2"
-                style={{ color: "hsl(120,50%,45%)" }}
-              />
-              <p
-                className="text-sm"
-                style={{ color: "hsl(var(--muted-foreground))" }}
+          {/* Transactions Tab */}
+          <TabsContent
+            value="transactions"
+            data-ocid="admin.transactions.panel"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2
+                  className="font-bold text-base"
+                  style={{ color: "hsl(var(--foreground))" }}
+                >
+                  Maagizo Yote / All Orders
+                </h2>
+                <p
+                  className="text-xs"
+                  style={{ color: "hsl(var(--muted-foreground))" }}
+                >
+                  Orodha ya maagizo na wateja
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchOrders()}
+                data-ocid="admin.transactions.refresh_button"
               >
-                Hakuna malipo yanayosubiri
-              </p>
+                <RefreshCw size={14} className="mr-1" />
+                Onyesha upya
+              </Button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Duka</TableHead>
-                    <TableHead>Mmiliki</TableHead>
-                    <TableHead>Ref #</TableHead>
-                    <TableHead>Tarehe</TableHead>
-                    <TableHead>Vitendo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingRefs.map((ref, i) => (
-                    <TableRow
-                      key={ref.id.toString()}
-                      data-ocid={`admin.pending_ref.item.${i + 1}`}
-                    >
-                      <TableCell className="font-medium text-sm">
-                        {ref.shopName}
-                      </TableCell>
-                      <TableCell className="text-sm">{ref.ownerName}</TableCell>
-                      <TableCell>
-                        <code
-                          className="text-xs px-2 py-1 rounded"
+
+            {ordersLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton
+                    key={i}
+                    className="h-24 rounded-xl"
+                    data-ocid="admin.transactions.loading_state"
+                  />
+                ))}
+              </div>
+            ) : !allOrders || allOrders.length === 0 ? (
+              <div
+                className="text-center py-16"
+                data-ocid="admin.transactions.empty_state"
+              >
+                <ShoppingBag
+                  size={36}
+                  className="mx-auto mb-3"
+                  style={{ color: "hsl(var(--muted-foreground))" }}
+                />
+                <p
+                  className="text-sm"
+                  style={{ color: "hsl(var(--muted-foreground))" }}
+                >
+                  Hakuna maagizo bado
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {allOrders.map((order, i) => (
+                  <TransactionRow
+                    key={order.id.toString()}
+                    order={order}
+                    idx={i}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" data-ocid="admin.settings.panel">
+            <div
+              className="rounded-2xl p-4 border"
+              style={{
+                background: "hsl(var(--card))",
+                borderColor: "hsl(var(--border))",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Settings size={18} style={{ color: "hsl(var(--primary))" }} />
+                <h2
+                  className="font-bold text-base"
+                  style={{ color: "hsl(var(--foreground))" }}
+                >
+                  Mipangilio ya App / App Settings
+                </h2>
+              </div>
+
+              {settingsLoading ? (
+                <Skeleton className="h-10 rounded-lg" />
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <Label style={{ color: "hsl(var(--foreground))" }}>
+                      Namba ya Mawasiliano / Contact Number
+                    </Label>
+                    {editingPayment ? (
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          value={paymentNumber}
+                          onChange={(e) => setPaymentNumber(e.target.value)}
+                          placeholder="+255700000000"
+                          className="flex-1"
+                          data-ocid="admin.payment_number.input"
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleSaveSettings()
+                          }
+                        />
+                        <Button
+                          onClick={handleSaveSettings}
+                          disabled={updateSettings.isPending}
+                          style={{
+                            background:
+                              "linear-gradient(135deg, #1565C0, #6A1B9A)",
+                            color: "#fff",
+                          }}
+                          data-ocid="admin.payment_number.save_button"
+                        >
+                          {updateSettings.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Hifadhi"
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setEditingPayment(false)}
+                          data-ocid="admin.payment_number.cancel_button"
+                        >
+                          Ghairi
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 mt-1">
+                        <div
+                          className="flex-1 px-3 py-2 rounded-lg text-sm"
                           style={{
                             background: "hsl(var(--muted))",
                             color: "hsl(var(--foreground))",
                           }}
                         >
-                          {ref.referenceNumber}
-                        </code>
-                      </TableCell>
-                      <TableCell
-                        className="text-xs"
-                        style={{ color: "hsl(var(--muted-foreground))" }}
-                      >
-                        {formatDate(ref.submittedAt)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            onClick={() => handleApprove(ref.id)}
-                            disabled={approve.isPending}
-                            style={{
-                              background: "hsl(120,50%,40%)",
-                              color: "#fff",
-                            }}
-                            data-ocid={`admin.approve_ref.primary_button.${i + 1}`}
-                          >
-                            <CheckCircle size={13} className="mr-1" />
-                            Idhinisha
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleReject(ref.id)}
-                            disabled={reject.isPending}
-                            style={{
-                              color: "hsl(0,70%,50%)",
-                              borderColor: "hsl(0,70%,50%)",
-                            }}
-                            data-ocid={`admin.reject_ref.delete_button.${i + 1}`}
-                          >
-                            <XCircle size={13} className="mr-1" />
-                            Kataa
-                          </Button>
+                          {settings?.platformPaymentNumber || "Haijawekwa bado"}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPaymentNumber(
+                              settings?.platformPaymentNumber || "",
+                            );
+                            setEditingPayment(true);
+                          }}
+                          data-ocid="admin.payment_number.edit_button"
+                        >
+                          Badilisha
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

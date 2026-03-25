@@ -33,7 +33,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle,
   Bell,
   Camera,
   Edit2,
@@ -48,11 +47,11 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Notification, Order, Product, Shop } from "../backend";
+import { BUSINESS_CATEGORIES } from "../constants/categories";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAllShops,
-  useAppSettings,
   useCreateProduct,
   useCreateShop,
   useDeleteProduct,
@@ -60,10 +59,8 @@ import {
   useMarkNotificationRead,
   useMyNotifications,
   useMyProfile,
-  useMyReferences,
   useShopOrders,
   useShopProducts,
-  useSubmitSubscriptionReference,
   useToggleShopAvailability,
   useUpdateOrderStatus,
   useUpdateProduct,
@@ -92,6 +89,7 @@ type ShopFormData = {
   facebook: string;
   tiktok: string;
   paymentNumbers: string;
+  category: string;
 };
 
 const emptyShopForm = (): ShopFormData => ({
@@ -105,6 +103,7 @@ const emptyShopForm = (): ShopFormData => ({
   facebook: "",
   tiktok: "",
   paymentNumbers: "",
+  category: "",
 });
 
 function ShopForm({
@@ -219,6 +218,24 @@ function ShopForm({
             className="mt-1"
           />
         </div>
+      </div>
+      <div>
+        <Label>Aina ya Biashara / Business Category *</Label>
+        <Select
+          value={form.category}
+          onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+        >
+          <SelectTrigger className="mt-1" data-ocid="shop_form.category.select">
+            <SelectValue placeholder="Chagua aina ya biashara..." />
+          </SelectTrigger>
+          <SelectContent>
+            {BUSINESS_CATEGORIES.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>
+                {cat.emoji} {cat.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div>
         <Label>Namba za Malipo / Payment Numbers</Label>
@@ -434,11 +451,6 @@ export function ShopOwnerDashboard() {
   const { data: products } = useShopProducts(myShop?.id || null);
   const { data: orders } = useShopOrders(myShop?.id || null);
   const { data: notifications } = useMyNotifications();
-  const { data: appSettings } = useAppSettings();
-  const { data: myRefs } = useMyReferences(myShop?.id || null);
-  const submitRef = useSubmitSubscriptionReference();
-  const [showSubModal, setShowSubModal] = useState(false);
-  const [refNumber, setRefNumber] = useState("");
 
   const createShop = useCreateShop();
   const updateShop = useUpdateShop();
@@ -561,6 +573,7 @@ export function ShopOwnerDashboard() {
         whatsapp: form.whatsapp,
         instagram: form.instagram,
         facebook: form.facebook,
+        category: form.category,
       },
       {
         onSuccess: (shopId) => {
@@ -592,6 +605,7 @@ export function ShopOwnerDashboard() {
         whatsapp: form.whatsapp,
         instagram: form.instagram,
         facebook: form.facebook,
+        category: form.category,
       },
       {
         onSuccess: () => {
@@ -840,6 +854,7 @@ export function ShopOwnerDashboard() {
                     facebook: myShop.facebook,
                     tiktok: myShop.tiktok,
                     paymentNumbers: myShop.paymentNumbers || "",
+                    category: (myShop as any).category || "",
                   }}
                   onSubmit={handleUpdateShop}
                   isPending={updateShop.isPending}
@@ -1034,76 +1049,6 @@ export function ShopOwnerDashboard() {
                 </div>
               </div>
             )}
-
-            {/* Subscription Status Card */}
-            {myShop &&
-              (() => {
-                const now = Date.now();
-                const expiryMs = Number(myShop.subscriptionExpiry) / 1_000_000;
-                const daysLeft = Math.floor(
-                  (expiryMs - now) / (1000 * 60 * 60 * 24),
-                );
-                const isExpired = !myShop.isActive || expiryMs < now;
-                const isWarning = !isExpired && daysLeft <= 7;
-                if (!isExpired && !isWarning) return null;
-                return (
-                  <div
-                    className="rounded-xl p-3 mb-3 flex items-start gap-2"
-                    style={{
-                      background: isExpired
-                        ? "hsl(0,60%,20%)"
-                        : "hsl(40,80%,15%)",
-                      border: `1px solid ${isExpired ? "hsl(0,60%,40%)" : "hsl(40,80%,45%)"}`,
-                    }}
-                    data-ocid="office.subscription.card"
-                  >
-                    <AlertTriangle
-                      size={16}
-                      style={{
-                        color: isExpired ? "hsl(0,70%,60%)" : "hsl(40,90%,60%)",
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
-                    />
-                    <div className="flex-1">
-                      <p
-                        className="text-sm font-semibold"
-                        style={{
-                          color: isExpired
-                            ? "hsl(0,70%,70%)"
-                            : "hsl(40,90%,70%)",
-                        }}
-                      >
-                        {isExpired
-                          ? "Usajili umeisha / Subscription expired"
-                          : `Usajili unaisha siku ${daysLeft} / Expires in ${daysLeft} days`}
-                      </p>
-                      {!myShop.isActive && (
-                        <p
-                          className="text-xs mt-1"
-                          style={{ color: "hsl(0,60%,65%)" }}
-                        >
-                          Duka lako halionekani kwa wateja. / Your shop is not
-                          visible to customers.
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setShowSubModal(true)}
-                        data-ocid="office.subscription.primary_button"
-                        className="mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #1565C0, #6A1B9A)",
-                          color: "#fff",
-                        }}
-                      >
-                        ud83dudcb3 Lipa Ada / Pay Fee
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
 
             {/* Tabs */}
             <Tabs defaultValue="products">
@@ -1816,180 +1761,6 @@ export function ShopOwnerDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Subscription Payment Modal */}
-      <Dialog
-        open={showSubModal}
-        onOpenChange={(o) => {
-          if (!o) {
-            setShowSubModal(false);
-            setRefNumber("");
-          }
-        }}
-      >
-        <DialogContent
-          data-ocid="office.subscription.dialog"
-          style={{
-            background: "hsl(var(--card))",
-            borderColor: "hsl(var(--border))",
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle style={{ color: "hsl(var(--foreground))" }}>
-              ud83dudcb3 Lipa Ada ya Usajili / Pay Subscription Fee
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div
-              className="p-3 rounded-xl text-sm font-semibold text-center"
-              style={{
-                background: "hsl(142,60%,15%)",
-                color: "hsl(142,70%,55%)",
-                border: "1px solid hsl(142,50%,35%)",
-              }}
-            >
-              Ada ya kila mwezi: TSH 10,000
-            </div>
-            {appSettings?.platformPaymentNumber ? (
-              <div
-                className="p-3 rounded-xl text-sm"
-                style={{
-                  background: "hsl(var(--muted))",
-                  color: "hsl(var(--foreground))",
-                }}
-              >
-                <p className="font-semibold mb-1">
-                  Lipa kwa Tigo Pesa / Pay via Tigo Pesa:
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded-full"
-                    style={{ background: "hsl(190,80%,35%)", color: "#fff" }}
-                  >
-                    TIGO PESA
-                  </span>
-                  <span
-                    className="text-lg font-bold"
-                    style={{ color: "hsl(200,80%,60%)" }}
-                  >
-                    {appSettings.platformPaymentNumber}
-                  </span>
-                </div>
-                <p
-                  className="text-xs mt-2"
-                  style={{ color: "hsl(var(--muted-foreground))" }}
-                >
-                  Baada ya kulipa, weka reference number hapa chini. / After
-                  paying, enter the reference number below.
-                </p>
-              </div>
-            ) : (
-              <p
-                className="text-sm"
-                style={{ color: "hsl(var(--muted-foreground))" }}
-              >
-                Wasiliana na msimamizi kwa namba ya malipo.
-              </p>
-            )}
-            <div>
-              <Label style={{ color: "hsl(var(--foreground))" }}>
-                Reference Number (6-20 chars)
-              </Label>
-              <Input
-                value={refNumber}
-                onChange={(e) => setRefNumber(e.target.value)}
-                placeholder="ABC123456"
-                className="mt-1"
-                data-ocid="office.subscription_ref.input"
-                maxLength={20}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSubModal(false);
-                  setRefNumber("");
-                }}
-                className="flex-1"
-                data-ocid="office.subscription.cancel_button"
-              >
-                Ghairi
-              </Button>
-              <Button
-                onClick={() => {
-                  if (!myShop) return;
-                  if (
-                    refNumber.trim().length < 6 ||
-                    refNumber.trim().length > 20
-                  ) {
-                    toast.error("Reference number lazima iwe na herufi 6-20");
-                    return;
-                  }
-                  submitRef.mutate(
-                    { shopId: myShop.id, referenceNumber: refNumber.trim() },
-                    {
-                      onSuccess: () => {
-                        toast.success(
-                          "Imepokewa! Admin ataihakikisha hivi karibuni.",
-                        );
-                        setShowSubModal(false);
-                        setRefNumber("");
-                      },
-                      onError: () => toast.error("Hitilafu u2014 jaribu tena"),
-                    },
-                  );
-                }}
-                disabled={submitRef.isPending}
-                className="flex-1 font-semibold"
-                style={{
-                  background: "linear-gradient(135deg, #1565C0, #6A1B9A)",
-                  color: "#fff",
-                }}
-                data-ocid="office.subscription.submit_button"
-              >
-                {submitRef.isPending ? "Inatuma..." : "Tuma / Submit"}
-              </Button>
-            </div>
-            {myRefs && myRefs.length > 0 && (
-              <div
-                className="p-3 rounded-xl text-xs space-y-1"
-                style={{ background: "hsl(var(--muted))" }}
-              >
-                <p
-                  className="font-semibold"
-                  style={{ color: "hsl(var(--foreground))" }}
-                >
-                  Zilizotumwa / Submitted:
-                </p>
-                {myRefs.slice(0, 3).map((r) => (
-                  <div key={r.id.toString()} className="flex justify-between">
-                    <span style={{ color: "hsl(var(--foreground))" }}>
-                      {r.referenceNumber}
-                    </span>
-                    <span
-                      style={{
-                        color:
-                          r.status === "approved"
-                            ? "hsl(120,50%,50%)"
-                            : r.status === "rejected"
-                              ? "hsl(0,60%,50%)"
-                              : "hsl(45,80%,55%)",
-                      }}
-                    >
-                      {r.status === "approved"
-                        ? "u2713 Imeidhinishwa"
-                        : r.status === "rejected"
-                          ? "u2717 Imekataliwa"
-                          : "u23f3 Inasubiri"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Product form dialog */}
       <Dialog
