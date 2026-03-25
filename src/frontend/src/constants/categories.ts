@@ -1,5 +1,11 @@
 export const BUSINESS_CATEGORIES = [
   {
+    id: "welding",
+    label: "Welding / Useremala wa Chuma",
+    emoji: "⚙️",
+    labelEn: "Welding & Metalwork",
+  },
+  {
     id: "soko",
     label: "Soko / Market",
     emoji: "🛒",
