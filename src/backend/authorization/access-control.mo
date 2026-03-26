@@ -37,13 +37,13 @@ module {
     };
   };
 
-  // Returns #guest instead of trapping for unregistered users.
-  // This prevents isCallerAdmin() and hasPermission() from throwing errors.
   public func getUserRole(state : AccessControlState, caller : Principal) : UserRole {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
-      case (null) { #guest };
+      case (null) {
+        Runtime.trap("User is not registered");
+      };
     };
   };
 
