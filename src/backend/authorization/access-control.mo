@@ -1,5 +1,6 @@
 import Map "mo:core/Map";
 import Principal "mo:core/Principal";
+import Runtime "mo:core/Runtime";
 
 module {
   public type UserRole = {
@@ -36,7 +37,7 @@ module {
     };
   };
 
-  // Returns the role for a caller. Never traps -- returns #guest for unknown/anonymous callers.
+  // Returns #guest for unknown/anonymous users instead of trapping.
   public func getUserRole(state : AccessControlState, caller : Principal) : UserRole {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {
@@ -47,15 +48,17 @@ module {
 
   public func assignRole(state : AccessControlState, caller : Principal, user : Principal, role : UserRole) {
     if (not (isAdmin(state, caller))) {
-      return; // silently ignore if not admin
+      Runtime.trap("Unauthorized: Only admins can assign user roles");
     };
     state.userRoles.add(user, role);
   };
 
   public func hasPermission(state : AccessControlState, caller : Principal, requiredRole : UserRole) : Bool {
     let userRole = getUserRole(state, caller);
-    if (userRole == #admin or requiredRole == #guest) { true } else {
-      userRole == requiredRole;
+    switch requiredRole {
+      case (#guest) { true };
+      case (#user) { userRole == #user or userRole == #admin };
+      case (#admin) { userRole == #admin };
     };
   };
 

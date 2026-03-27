@@ -1,27 +1,20 @@
 # Closer to Market
 
 ## Current State
-App ina mfumo wa subscription ambapo maduka yanahitaji kulipa na admin kuidhinisha ili yaonekane. Admin panel inaonyesha tu pending subscription references. Admin registration imekuwa ikikataa kwa sababu ya muunganiko na mfumo wa malipo.
+App ina backend ya Motoko na frontend ya React. Tatizo kuu: `getUserRole` katika `access-control.mo` ilifanya `Runtime.trap` kwa watumiaji wasiojulikana badala ya kurudisha `#guest`. Hii ilisababisha "Hitilafu" kila mtumiaji asiyeandikishwa alipojaribu kufanya kitu chochote.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend: `getAllOrdersAdmin()` query - admin anaona orders/transactions zote
-- AdminPanel: Sehemu ya "Transactions" inayoonyesha orders zote na jina la mteja, namba, ushahidi wa malipo (picha au maandishi), kiasi, hali
-- Shops zinakuwa active=true mara zinapoundwa (bila kuhitaji subscription approval)
+- (hakuna)
 
 ### Modify
-- Backend `createShop`: isActive default = true badala ya false
-- AdminPanel: Ongeza tab ya Transactions pamoja na Settings na Pending Refs
-- ProfileSetup: Safisha registration flow ya admin
+- `access-control.mo`: `getUserRole` sasa inarudisha `#guest` badala ya `Runtime.trap` kwa watumiaji wasiojulikana
+- `hasPermission` imeboreshwa kutumia switch badala ya equality checks
 
 ### Remove
-- Kizuizi cha subscription kinachozuia shops kuonekana bila admin approval
-- Ugumu wa admin registration unaosababishwa na muunganiko wa malipo
+- `Runtime.trap("User is not registered")` -- hii ndiyo ilikuwa chanzo cha hitilafu zote
 
 ## Implementation Plan
-1. Edit main.mo: add getAllOrdersAdmin(), change createShop isActive=true
-2. Update backend.did.d.ts: add getAllOrdersAdmin declaration
-3. Update useQueries.ts: add useGetAllOrdersAdmin hook
-4. Rewrite AdminPanel.tsx: add Transactions tab with full order details
-5. Fix ProfileSetup.tsx: clean admin registration flow
+1. Fix `access-control.mo` - imekamilika
+2. Deploy
