@@ -1,3 +1,4 @@
+import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AppSettings,
@@ -10,6 +11,18 @@ import type {
 } from "../backend";
 import { ExternalBlob } from "../backend";
 import { useActor } from "./useActor";
+
+export function useAllUserProfiles() {
+  const { actor, isFetching } = useActor();
+  return useQuery<[Principal, UserProfile][]>({
+    queryKey: ["allUserProfiles"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllUserProfiles();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
 
 export function useAllShops() {
   const { actor, isFetching } = useActor();

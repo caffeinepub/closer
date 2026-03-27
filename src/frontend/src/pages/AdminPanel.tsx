@@ -4,12 +4,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, RefreshCw, Settings, ShoppingBag } from "lucide-react";
+import type { Principal } from "@icp-sdk/core/principal";
+import {
+  Loader2,
+  Package,
+  RefreshCw,
+  Settings,
+  ShoppingBag,
+  Store,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Order } from "../backend";
+import type { Order, Product, Shop, UserProfile } from "../backend";
 import {
   useAllOrdersAdmin,
+  useAllProducts,
+  useAllShops,
+  useAllUserProfiles,
   useAppSettings,
   useUpdateAppSettings,
 } from "../hooks/useQueries";
@@ -18,47 +30,255 @@ function formatTZS(amount: bigint | number): string {
   return `TZS ${Number(amount).toLocaleString()}`;
 }
 
-function PaymentStatusBadge({ status }: { status: string }) {
-  const s = status.toLowerCase();
-  if (s === "paid" || s === "imelipwa") {
-    return (
-      <Badge
-        style={{ background: "hsl(142,50%,40%)", color: "#fff" }}
-        data-ocid="admin.transaction.paid_status"
-      >
-        ✅ Imelipwa
-      </Badge>
-    );
-  }
-  if (s === "pending" || s === "inasubiri") {
-    return (
-      <Badge
-        style={{ background: "hsl(45,90%,45%)", color: "#fff" }}
-        data-ocid="admin.transaction.pending_status"
-      >
-        ⏳ Inasubiri
-      </Badge>
-    );
-  }
+function CountBadge({ count }: { count: number }) {
+  if (count === 0) return null;
   return (
     <Badge
+      className="ml-1 text-xs px-1.5 py-0 h-5 min-w-5"
       style={{
-        background: "hsl(var(--muted))",
-        color: "hsl(var(--muted-foreground))",
+        background: "linear-gradient(135deg, #1565C0, #6A1B9A)",
+        color: "#fff",
       }}
-      data-ocid="admin.transaction.unpaid_status"
     >
-      ❌ Haijalipiwa
+      {count}
     </Badge>
   );
 }
 
-function TransactionRow({ order, idx }: { order: Order; idx: number }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customerName = (order as any).customerName || "";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customerPhone = (order as any).customerPhone || "";
+function SectionHeader({
+  title,
+  subtitle,
+  onRefresh,
+}: {
+  title: string;
+  subtitle: string;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <div>
+        <h2
+          className="font-bold text-base"
+          style={{ color: "hsl(var(--foreground))" }}
+        >
+          {title}
+        </h2>
+        <p
+          className="text-xs"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          {subtitle}
+        </p>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onRefresh}
+        data-ocid="admin.refresh_button"
+      >
+        <RefreshCw size={14} className="mr-1" />
+        Onyesha upya
+      </Button>
+    </div>
+  );
+}
 
+function LoadingCards() {
+  return (
+    <div className="space-y-3" data-ocid="admin.loading_state">
+      {[1, 2, 3].map((i) => (
+        <Skeleton key={i} className="h-20 rounded-xl" />
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({
+  icon,
+  message,
+}: { icon: React.ReactNode; message: string }) {
+  return (
+    <div className="text-center py-16" data-ocid="admin.empty_state">
+      <div
+        className="flex justify-center mb-3"
+        style={{ color: "hsl(var(--muted-foreground))" }}
+      >
+        {icon}
+      </div>
+      <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>
+        {message}
+      </p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span style={{ color: "hsl(var(--muted-foreground))" }}>{label}:</span>
+      <span
+        className="font-medium truncate"
+        style={{ color: "hsl(var(--foreground))" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// ─── Users Tab ────────────────────────────────────────────────────────────────
+
+function UserCard({
+  entry,
+  idx,
+}: {
+  entry: [Principal, UserProfile];
+  idx: number;
+}) {
+  const [, profile] = entry;
+  const initials = profile.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div
+      className="rounded-xl border p-3 flex items-start gap-3"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--border))",
+      }}
+      data-ocid={`admin.users.item.${idx + 1}`}
+    >
+      <div
+        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+        style={{
+          background: "linear-gradient(135deg, #1565C0, #6A1B9A)",
+          color: "#fff",
+        }}
+      >
+        {initials || "?"}
+      </div>
+      <div className="flex-1 min-w-0 space-y-1">
+        <p
+          className="font-semibold text-sm truncate"
+          style={{ color: "hsl(var(--foreground))" }}
+        >
+          {profile.name || "(Jina halijawekwa)"}
+        </p>
+        <InfoRow label="📞" value={profile.phone || "—"} />
+        <InfoRow label="✉️" value={profile.email || "—"} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Shops Tab ────────────────────────────────────────────────────────────────
+
+function ShopCard({ shop, idx }: { shop: Shop; idx: number }) {
+  return (
+    <div
+      className="rounded-xl border p-3 space-y-1.5"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--border))",
+      }}
+      data-ocid={`admin.shops.item.${idx + 1}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className="font-semibold text-sm truncate"
+          style={{ color: "hsl(var(--foreground))" }}
+        >
+          🏪 {shop.name}
+        </p>
+        <div className="flex items-center gap-1 shrink-0">
+          {shop.isActive && (
+            <span
+              className="w-2 h-2 rounded-full bg-green-500 inline-block"
+              title="Active"
+            />
+          )}
+          <Badge
+            variant="outline"
+            className="text-xs px-1.5 py-0 h-5"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            {shop.isActive ? "Wazi" : "Imefungwa"}
+          </Badge>
+        </div>
+      </div>
+      <InfoRow label="Kundi" value={(shop as any).category || "—"} />
+      <InfoRow label="Anwani" value={shop.address || "—"} />
+    </div>
+  );
+}
+
+// ─── Products Tab ─────────────────────────────────────────────────────────────
+
+function ProductCard({ product, idx }: { product: Product; idx: number }) {
+  return (
+    <div
+      className="rounded-xl border p-3 space-y-1.5"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--border))",
+      }}
+      data-ocid={`admin.products.item.${idx + 1}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className="font-semibold text-sm truncate"
+          style={{ color: "hsl(var(--foreground))" }}
+        >
+          📦 {product.name}
+        </p>
+        <span
+          className="font-bold text-sm shrink-0"
+          style={{ color: "hsl(var(--primary))" }}
+        >
+          {formatTZS(product.price)}
+        </span>
+      </div>
+      <InfoRow label="Aina" value={product.category || "—"} />
+      <InfoRow label="Stoo" value={Number(product.stock).toString()} />
+      <InfoRow label="Duka #" value={product.shopId.toString()} />
+    </div>
+  );
+}
+
+// ─── Orders Tab ───────────────────────────────────────────────────────────────
+
+function OrderStatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  let bg = "hsl(var(--muted))";
+  let color = "hsl(var(--muted-foreground))";
+  let label = status;
+
+  if (s === "completed" || s === "imekamilika") {
+    bg = "oklch(0.55 0.16 145)";
+    color = "#fff";
+    label = "✅ Imekamilika";
+  } else if (s === "pending" || s === "inasubiri") {
+    bg = "oklch(0.72 0.18 75)";
+    color = "#fff";
+    label = "⏳ Inasubiri";
+  } else if (s === "cancelled" || s === "imefutwa") {
+    bg = "oklch(0.55 0.22 25)";
+    color = "#fff";
+    label = "❌ Imefutwa";
+  }
+
+  return (
+    <Badge style={{ background: bg, color }} className="text-xs">
+      {label}
+    </Badge>
+  );
+}
+
+function OrderCard({ order, idx }: { order: Order; idx: number }) {
   return (
     <div
       className="rounded-xl border p-3 space-y-2"
@@ -66,35 +286,33 @@ function TransactionRow({ order, idx }: { order: Order; idx: number }) {
         background: "hsl(var(--card))",
         borderColor: "hsl(var(--border))",
       }}
-      data-ocid={`admin.transaction.item.${idx + 1}`}
+      data-ocid={`admin.orders.item.${idx + 1}`}
     >
-      {/* Customer info */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p
             className="font-semibold text-sm truncate"
             style={{ color: "hsl(var(--foreground))" }}
           >
-            👤 {customerName || "(Jina halijawekwa)"}
+            👤 {order.customerName || "(Jina halijawekwa)"}
           </p>
-          {customerPhone && (
+          {order.customerPhone && (
             <p
               className="text-xs"
               style={{ color: "hsl(var(--muted-foreground))" }}
             >
-              📞 {customerPhone}
+              📞 {order.customerPhone}
             </p>
           )}
         </div>
-        <PaymentStatusBadge status={order.status} />
+        <OrderStatusBadge status={order.status} />
       </div>
-
-      {/* Order details */}
-      <div
-        className="flex items-center justify-between text-xs"
-        style={{ color: "hsl(var(--muted-foreground))" }}
-      >
-        <span>Agizo #{order.id.toString()}</span>
+      <div className="flex items-center justify-between">
+        <div className="text-xs space-y-0.5">
+          <InfoRow label="Agizo #" value={order.id.toString()} />
+          <InfoRow label="Bidhaa #" value={order.productId.toString()} />
+          <InfoRow label="Idadi" value={Number(order.quantity).toString()} />
+        </div>
         <span
           className="font-bold text-sm"
           style={{ color: "hsl(var(--primary))" }}
@@ -102,37 +320,50 @@ function TransactionRow({ order, idx }: { order: Order; idx: number }) {
           {formatTZS(order.totalPrice)}
         </span>
       </div>
-
-      {/* Order quantity */}
-      <div
-        className="text-xs"
-        style={{ color: "hsl(var(--muted-foreground))" }}
-      >
-        Idadi: {Number(order.quantity)}
-      </div>
     </div>
   );
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export function AdminPanel() {
   const {
-    data: settings,
-    isLoading: settingsLoading,
-    refetch: refetchSettings,
-  } = useAppSettings();
+    data: users,
+    isLoading: usersLoading,
+    refetch: refetchUsers,
+  } = useAllUserProfiles();
+
+  const {
+    data: shops,
+    isLoading: shopsLoading,
+    refetch: refetchShops,
+  } = useAllShops();
+
+  const {
+    data: products,
+    isLoading: productsLoading,
+    refetch: refetchProducts,
+  } = useAllProducts();
+
   const {
     data: allOrders,
     isLoading: ordersLoading,
     refetch: refetchOrders,
   } = useAllOrdersAdmin();
-  const updateSettings = useUpdateAppSettings();
 
+  const {
+    data: settings,
+    isLoading: settingsLoading,
+    refetch: refetchSettings,
+  } = useAppSettings();
+
+  const updateSettings = useUpdateAppSettings();
   const [paymentNumber, setPaymentNumber] = useState("");
   const [editingPayment, setEditingPayment] = useState(false);
 
   const handleSaveSettings = () => {
     if (!paymentNumber.trim()) {
-      toast.error("Ingiza namba ya malipo");
+      toast.error("Ingiza namba ya mawasiliano");
       return;
     }
     updateSettings.mutate(paymentNumber.trim(), {
@@ -145,123 +376,170 @@ export function AdminPanel() {
     });
   };
 
+  const userCount = users?.length ?? 0;
+  const shopCount = shops?.length ?? 0;
+  const productCount = products?.length ?? 0;
+  const orderCount = allOrders?.length ?? 0;
+
   return (
     <div
       className="flex-1 overflow-y-auto pb-24"
       style={{ background: "hsl(var(--background))" }}
       data-ocid="admin.panel"
     >
-      <div className="px-4 pt-6 pb-4">
-        <h1
-          className="text-xl font-bold mb-1"
-          style={{ color: "hsl(var(--foreground))" }}
-        >
-          🛡️ Admin Panel
-        </h1>
-        <p
-          className="text-xs"
-          style={{ color: "hsl(var(--muted-foreground))" }}
-        >
-          Usimamizi wa App / App Management
+      {/* Header */}
+      <div
+        className="px-4 pt-6 pb-4"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.25 0.08 260), oklch(0.2 0.1 310))",
+        }}
+      >
+        <h1 className="text-xl font-bold mb-1 text-white">🛡️ Admin Panel</h1>
+        <p className="text-xs text-white/70">
+          Usimamizi wa App • Closer to Market
         </p>
+
+        {/* Quick stats */}
+        <div className="grid grid-cols-4 gap-2 mt-4">
+          {[
+            { label: "Watumiaji", value: userCount, emoji: "👥" },
+            { label: "Maduka", value: shopCount, emoji: "🏪" },
+            { label: "Bidhaa", value: productCount, emoji: "📦" },
+            { label: "Maagizo", value: orderCount, emoji: "🛒" },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-xl p-2 text-center"
+              style={{ background: "rgba(255,255,255,0.12)" }}
+            >
+              <div className="text-base">{stat.emoji}</div>
+              <div className="text-lg font-bold text-white leading-none">
+                {stat.value}
+              </div>
+              <div className="text-xs text-white/70 mt-0.5 leading-tight">
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="px-4">
-        <Tabs defaultValue="transactions" data-ocid="admin.tabs">
-          <TabsList className="w-full mb-4">
+      <div className="px-4 pt-4">
+        <Tabs defaultValue="users" data-ocid="admin.tabs">
+          <TabsList className="w-full mb-4 overflow-x-auto flex">
             <TabsTrigger
-              value="transactions"
-              className="flex-1 flex items-center gap-2"
-              data-ocid="admin.transactions.tab"
+              value="users"
+              className="flex-1 flex items-center gap-1 text-xs"
+              data-ocid="admin.users.tab"
             >
-              <ShoppingBag size={14} />
+              <Users size={13} />
+              Watumiaji
+              <CountBadge count={userCount} />
+            </TabsTrigger>
+            <TabsTrigger
+              value="shops"
+              className="flex-1 flex items-center gap-1 text-xs"
+              data-ocid="admin.shops.tab"
+            >
+              <Store size={13} />
+              Maduka
+              <CountBadge count={shopCount} />
+            </TabsTrigger>
+            <TabsTrigger
+              value="products"
+              className="flex-1 flex items-center gap-1 text-xs"
+              data-ocid="admin.products.tab"
+            >
+              <Package size={13} />
+              Bidhaa
+              <CountBadge count={productCount} />
+            </TabsTrigger>
+            <TabsTrigger
+              value="orders"
+              className="flex-1 flex items-center gap-1 text-xs"
+              data-ocid="admin.orders.tab"
+            >
+              <ShoppingBag size={13} />
               Maagizo
-              {allOrders && allOrders.length > 0 && (
-                <Badge
-                  className="ml-1 text-xs px-1.5 py-0 h-5"
-                  style={{
-                    background: "hsl(var(--primary))",
-                    color: "hsl(var(--primary-foreground))",
-                  }}
-                >
-                  {allOrders.length}
-                </Badge>
-              )}
+              <CountBadge count={orderCount} />
             </TabsTrigger>
             <TabsTrigger
               value="settings"
-              className="flex-1 flex items-center gap-2"
+              className="flex-1 flex items-center gap-1 text-xs"
               data-ocid="admin.settings.tab"
             >
-              <Settings size={14} />
+              <Settings size={13} />
               Mipangilio
             </TabsTrigger>
           </TabsList>
 
-          {/* Transactions Tab */}
-          <TabsContent
-            value="transactions"
-            data-ocid="admin.transactions.panel"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2
-                  className="font-bold text-base"
-                  style={{ color: "hsl(var(--foreground))" }}
-                >
-                  Maagizo Yote / All Orders
-                </h2>
-                <p
-                  className="text-xs"
-                  style={{ color: "hsl(var(--muted-foreground))" }}
-                >
-                  Orodha ya maagizo na wateja
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetchOrders()}
-                data-ocid="admin.transactions.refresh_button"
-              >
-                <RefreshCw size={14} className="mr-1" />
-                Onyesha upya
-              </Button>
-            </div>
-
-            {ordersLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton
-                    key={i}
-                    className="h-24 rounded-xl"
-                    data-ocid="admin.transactions.loading_state"
-                  />
-                ))}
-              </div>
-            ) : !allOrders || allOrders.length === 0 ? (
-              <div
-                className="text-center py-16"
-                data-ocid="admin.transactions.empty_state"
-              >
-                <ShoppingBag
-                  size={36}
-                  className="mx-auto mb-3"
-                  style={{ color: "hsl(var(--muted-foreground))" }}
-                />
-                <p
-                  className="text-sm"
-                  style={{ color: "hsl(var(--muted-foreground))" }}
-                >
-                  Hakuna maagizo bado
-                </p>
-              </div>
+          {/* ── Users ── */}
+          <TabsContent value="users" data-ocid="admin.users.panel">
+            <SectionHeader
+              title="Watumiaji Wote"
+              subtitle={`Watumiaji ${userCount} wamesajiliwa`}
+              onRefresh={refetchUsers}
+            />
+            {usersLoading ? (
+              <LoadingCards />
+            ) : !users || users.length === 0 ? (
+              <EmptyState
+                icon={<Users size={36} />}
+                message="Hakuna watumiaji bado"
+              />
             ) : (
               <div className="space-y-3">
-                {allOrders.map((order, i) => (
-                  <TransactionRow
-                    key={order.id.toString()}
-                    order={order}
+                {users.map((entry, i) => (
+                  <UserCard key={entry[0].toString()} entry={entry} idx={i} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── Shops ── */}
+          <TabsContent value="shops" data-ocid="admin.shops.panel">
+            <SectionHeader
+              title="Maduka Yote"
+              subtitle={`Maduka ${shopCount} yamesajiliwa`}
+              onRefresh={refetchShops}
+            />
+            {shopsLoading ? (
+              <LoadingCards />
+            ) : !shops || shops.length === 0 ? (
+              <EmptyState
+                icon={<Store size={36} />}
+                message="Hakuna maduka bado"
+              />
+            ) : (
+              <div className="space-y-3">
+                {shops.map((shop, i) => (
+                  <ShopCard key={shop.id.toString()} shop={shop} idx={i} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── Products ── */}
+          <TabsContent value="products" data-ocid="admin.products.panel">
+            <SectionHeader
+              title="Bidhaa Zote"
+              subtitle={`Bidhaa ${productCount} zinapatikana`}
+              onRefresh={refetchProducts}
+            />
+            {productsLoading ? (
+              <LoadingCards />
+            ) : !products || products.length === 0 ? (
+              <EmptyState
+                icon={<Package size={36} />}
+                message="Hakuna bidhaa bado"
+              />
+            ) : (
+              <div className="space-y-3">
+                {products.map((product, i) => (
+                  <ProductCard
+                    key={product.id.toString()}
+                    product={product}
                     idx={i}
                   />
                 ))}
@@ -269,7 +547,30 @@ export function AdminPanel() {
             )}
           </TabsContent>
 
-          {/* Settings Tab */}
+          {/* ── Orders ── */}
+          <TabsContent value="orders" data-ocid="admin.orders.panel">
+            <SectionHeader
+              title="Maagizo Yote"
+              subtitle={`Maagizo ${orderCount} yamewekwa`}
+              onRefresh={refetchOrders}
+            />
+            {ordersLoading ? (
+              <LoadingCards />
+            ) : !allOrders || allOrders.length === 0 ? (
+              <EmptyState
+                icon={<ShoppingBag size={36} />}
+                message="Hakuna maagizo bado"
+              />
+            ) : (
+              <div className="space-y-3">
+                {allOrders.map((order, i) => (
+                  <OrderCard key={order.id.toString()} order={order} idx={i} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── Settings ── */}
           <TabsContent value="settings" data-ocid="admin.settings.panel">
             <div
               className="rounded-2xl p-4 border"
@@ -284,7 +585,7 @@ export function AdminPanel() {
                   className="font-bold text-base"
                   style={{ color: "hsl(var(--foreground))" }}
                 >
-                  Mipangilio ya App / App Settings
+                  Mipangilio ya App
                 </h2>
               </div>
 
@@ -303,7 +604,7 @@ export function AdminPanel() {
                           onChange={(e) => setPaymentNumber(e.target.value)}
                           placeholder="+255700000000"
                           className="flex-1"
-                          data-ocid="admin.payment_number.input"
+                          data-ocid="admin.settings.input"
                           onKeyDown={(e) =>
                             e.key === "Enter" && handleSaveSettings()
                           }
@@ -316,7 +617,7 @@ export function AdminPanel() {
                               "linear-gradient(135deg, #1565C0, #6A1B9A)",
                             color: "#fff",
                           }}
-                          data-ocid="admin.payment_number.save_button"
+                          data-ocid="admin.settings.save_button"
                         >
                           {updateSettings.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -327,7 +628,7 @@ export function AdminPanel() {
                         <Button
                           variant="outline"
                           onClick={() => setEditingPayment(false)}
-                          data-ocid="admin.payment_number.cancel_button"
+                          data-ocid="admin.settings.cancel_button"
                         >
                           Ghairi
                         </Button>
@@ -352,7 +653,7 @@ export function AdminPanel() {
                             );
                             setEditingPayment(true);
                           }}
-                          data-ocid="admin.payment_number.edit_button"
+                          data-ocid="admin.settings.edit_button"
                         >
                           Badilisha
                         </Button>
