@@ -52,6 +52,8 @@ export interface Shop {
     whatsapp: string;
     description: string;
     isActive: boolean;
+    isAvailable: boolean;
+    category: string;
     paymentNumbers: string;
     facebook: string;
     longitude: number;
@@ -93,10 +95,11 @@ export interface backendInterface {
     approveSubscriptionReference(referenceId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createProduct(name: string, description: string, price: bigint, category: string, image: ExternalBlob, stock: bigint, shopId: bigint): Promise<bigint>;
-    createShop(name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string): Promise<bigint>;
+    createShop(name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string, category: string): Promise<bigint>;
     deleteProduct(productId: bigint): Promise<void>;
     deleteShop(shopId: bigint): Promise<void>;
     getActiveShops(): Promise<Array<Shop>>;
+    getActiveShopsByCategory(category: string): Promise<Array<Shop>>;
     getAllProducts(): Promise<Array<Product>>;
     getAllReferences(): Promise<Array<PaymentReference>>;
     getAllShops(): Promise<Array<Shop>>;
@@ -114,6 +117,7 @@ export interface backendInterface {
     getShop(shopId: bigint): Promise<Shop | null>;
     getShopOrders(shopId: bigint): Promise<Array<Order>>;
     getShopProducts(shopId: bigint): Promise<Array<Product>>;
+    getShopsByCategory(category: string): Promise<Array<Shop>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     markNotificationAsRead(notificationId: bigint): Promise<void>;
@@ -121,14 +125,17 @@ export interface backendInterface {
     registerProfile(name: string, phone: string, email: string, preferredTheme: string): Promise<void>;
     rejectSubscriptionReference(referenceId: bigint): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    submitSubscriptionReference(shopId: bigint, referenceNumber: string): Promise<bigint>;
+    toggleShopAvailability(shopId: bigint): Promise<boolean>;
     updateAppSettings(platformPaymentNumber: string): Promise<void>;
     updateOrderStatus(orderId: bigint, status: string): Promise<void>;
     updatePaymentNote(orderId: bigint, paymentNote: string): Promise<void>;
     updateProduct(productId: bigint, name: string, description: string, price: bigint, category: string, image: ExternalBlob, stock: bigint): Promise<void>;
     updateProfilePicture(callerProfilePicture: ExternalBlob): Promise<void>;
-    updateShop(shopId: bigint, name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string): Promise<void>;
+    updateShop(shopId: bigint, name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string, category: string): Promise<void>;
     updateShopLogo(shopId: bigint, shopLogo: ExternalBlob): Promise<void>;
     updateShopPaymentNumbers(shopId: bigint, paymentNumbers: string): Promise<void>;
     uploadPaymentProof(orderId: bigint, paymentProof: ExternalBlob, paymentNote: string): Promise<void>;
+    claimAdminIfNoneYet(): Promise<boolean>;
+    forceResetAndClaimAdmin(secret: string): Promise<boolean>;
+    promoteUserToAdmin(user: Principal): Promise<void>;
 }

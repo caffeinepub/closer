@@ -160,6 +160,7 @@ actor {
 
   // Helper: ensure caller is registered in access control.
   // First-ever caller becomes admin; subsequent callers become regular users.
+  // getUserRole now returns #guest for unknown users (no trap), so this is safe.
   func ensureRegistered(caller : Principal) {
     if (caller.isAnonymous()) { Runtime.trap("Anonymous users cannot register") };
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
@@ -207,7 +208,7 @@ actor {
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
+      return null;
     };
     userProfiles.get(user);
   };
@@ -224,8 +225,6 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // registerProfile now auto-registers the caller in access control.
-  // No separate _initializeAccessControlWithSecret call is needed.
   // First caller becomes admin; all others become regular users.
   public shared ({ caller }) func registerProfile(name : Text, phone : Text, email : Text, preferredTheme : Text) : async () {
     ensureRegistered(caller);
@@ -657,7 +656,7 @@ actor {
 
   func createOrderNotification(shopId : Nat, orderId : Nat, productName : Text) {
     switch (shops.get(shopId)) {
-      case (null) { Runtime.trap("Shop does not exist") };
+      case (null) { };
       case (?shop) {
         let notification : Notification = {
           id = nextNotificationId;
@@ -727,10 +726,11 @@ actor {
 
   public query ({ caller }) func getAllOrdersAdmin() : async [Order] {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admin can view all orders");
+      return [];
     };
     orders.values().toArray().sort(func(a, b) { Nat.compare(a.id, b.id) });
   };
+
   public query ({ caller }) func getShopsByCategory(category : Text) : async [ShopWithAvailability] {
     shops.values().toArray().filter(func(shop) { switch (shopCategories.get(shop.id)) { case (?c) { c == category }; case (null) { false } } }).map(withAvailability);
   };
@@ -777,7 +777,7 @@ actor {
         if (order.customerId == caller or isShopOwner or AccessControl.isAdmin(accessControlState, caller)) {
           ?order;
         } else {
-          Runtime.trap("Unauthorized: Can only view your own orders or orders for your shop");
+          null;
         };
       };
     };
@@ -785,177 +785,6 @@ actor {
 
   public query ({ caller }) func getActiveShops() : async [ShopWithAvailability] {
     shops.values().toArray().filter(func(shop) { shop.isActive }).map(withAvailability);
-  };
-
-  public shared ({ caller }) func submitSubscriptionReference(shopId : Nat, referenceNumber : Text) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can submit subscription references");
-    };
-
-    if (referenceNumber.size() < 6) {
-      Runtime.trap("Reference number must be at least 6 characters");
-    };
-
-    if (referenceNumber.size() > 20) {
-      Runtime.trap("Reference number must be at most 20 characters");
-    };
-
-    if (not referenceNumber.chars().all(func(c) { (c >= '0' and c <= '9') or (c >= 'A' and c <= 'Z') or (c >= 'a' and c <= 'z') })) {
-      Runtime.trap("Reference number must be alphanumeric");
-    };
-
-    let existingReference = paymentReferences.values().find(func(ref) { ref.referenceNumber == referenceNumber });
-    if (existingReference != null) {
-      Runtime.trap("Reference number already exists");
-    };
-
-    let shop = switch (shops.get(shopId)) {
-      case (null) { Runtime.trap("Shop does not exist") };
-      case (?shop) { shop };
-    };
-
-    if (shop.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only shop owner can submit payment references for this shop");
-    };
-
-    switch (userProfiles.get(caller)) {
-      case (null) { Runtime.trap("User profile does not exist, please create a user profile") };
-      case (?userProfile) {
-        let newReference : PaymentReference = {
-          id = nextPaymentReferenceId;
-          shopId;
-          shopName = shop.name;
-          ownerId = caller;
-          ownerName = userProfile.name;
-          referenceNumber;
-          status = "pending";
-          submittedAt = Time.now();
-        };
-
-        paymentReferences.add(nextPaymentReferenceId, newReference);
-        let referenceId = nextPaymentReferenceId;
-        nextPaymentReferenceId += 1;
-
-        let adminNotification : Notification = {
-          id = nextNotificationId;
-          ownerId = Principal.fromText("2vxsx-fae");
-          orderId = 0;
-          message = "Shop " # shop.name # " - " # userProfile.name # " submitted payment reference " # referenceNumber;
-          timestamp = Time.now();
-          isRead = false;
-        };
-        notifications.add(nextNotificationId, adminNotification);
-        nextNotificationId += 1;
-
-        referenceId;
-      };
-    };
-  };
-
-  public shared ({ caller }) func approveSubscriptionReference(referenceId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can approve subscription references");
-    };
-    switch (paymentReferences.get(referenceId)) {
-      case (null) { Runtime.trap("Reference does not exist") };
-      case (?reference) {
-        if (reference.status == "approved") {
-          Runtime.trap("Reference is already approved");
-        };
-        if (reference.status == "rejected") {
-          Runtime.trap("Reference has already been rejected and cannot be re-approved");
-        };
-        let updatedReference : PaymentReference = {
-          id = referenceId;
-          shopId = reference.shopId;
-          shopName = reference.shopName;
-          ownerId = reference.ownerId;
-          ownerName = reference.ownerName;
-          referenceNumber = reference.referenceNumber;
-          status = "approved";
-          submittedAt = reference.submittedAt;
-        };
-        paymentReferences.add(referenceId, updatedReference);
-
-        switch (shops.get(reference.shopId)) {
-          case (null) { Runtime.trap("Shop does not exist") };
-          case (?shop) {
-            let updatedShop : Shop = {
-              id = shop.id;
-              name = shop.name;
-              description = shop.description;
-              address = shop.address;
-              latitude = shop.latitude;
-              longitude = shop.longitude;
-              tiktok = shop.tiktok;
-              whatsapp = shop.whatsapp;
-              instagram = shop.instagram;
-              facebook = shop.facebook;
-              owner = shop.owner;
-              logo = shop.logo;
-              paymentNumbers = shop.paymentNumbers;
-              subscriptionExpiry = Time.now() + (30 * 24 * 60 * 60 * 1_000_000_000 : Int);
-              isActive = true;
-            };
-            shops.add(shop.id, updatedShop);
-          };
-        };
-      };
-    };
-  };
-
-  public shared ({ caller }) func rejectSubscriptionReference(referenceId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can reject subscription references");
-    };
-    switch (paymentReferences.get(referenceId)) {
-      case (null) { Runtime.trap("Reference does not exist") };
-      case (?reference) {
-        if (reference.status == "rejected") {
-          Runtime.trap("Reference is already rejected");
-        };
-        let updatedReference : PaymentReference = {
-          id = referenceId;
-          shopId = reference.shopId;
-          shopName = reference.shopName;
-          ownerId = reference.ownerId;
-          ownerName = reference.ownerName;
-          referenceNumber = reference.referenceNumber;
-          status = "rejected";
-          submittedAt = reference.submittedAt;
-        };
-        paymentReferences.add(referenceId, updatedReference);
-      };
-    };
-  };
-
-  public query ({ caller }) func getPendingReferences() : async [PaymentReference] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admin can view pending references");
-    };
-    paymentReferences.values().filter(func(ref) { ref.status == "pending" }).toArray().sort();
-  };
-
-  public query ({ caller }) func getAllReferences() : async [PaymentReference] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admin can view all references");
-    };
-    paymentReferences.values().toArray().sort();
-  };
-
-  public query ({ caller }) func getMyReferences(shopId : Nat) : async [PaymentReference] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view their references");
-    };
-    switch (shops.get(shopId)) {
-      case (null) { Runtime.trap("Shop does not exist") };
-      case (?shop) {
-        if (shop.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-          Runtime.trap("Unauthorized: Only shop owner can view references for this shop");
-        };
-        paymentReferences.values().filter(func(ref) { ref.shopId == shopId }).toArray().sort();
-      };
-    };
   };
 
   // Allows anyone to claim admin if no admin has been assigned yet.
@@ -991,4 +820,3 @@ actor {
     true
   };
 };
-
