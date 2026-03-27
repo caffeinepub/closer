@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, ChevronDown, ChevronUp, Loader2, User } from "lucide-react";
+import { Camera, Loader2, User } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { type Theme, useTheme } from "../context/ThemeContext";
@@ -17,7 +17,6 @@ export function ProfileSetup() {
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showAdminSection, setShowAdminSection] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { theme, setTheme } = useTheme();
   const updatePicture = useUpdateProfilePicture();
@@ -47,7 +46,6 @@ export function ProfileSetup() {
 
     setSaving(true);
     try {
-      // registerProfile auto-registers the user in access control.
       await actor.registerProfile(
         name.trim(),
         phone.trim(),
@@ -55,26 +53,12 @@ export function ProfileSetup() {
         theme,
       );
 
+      // Check if caller became admin (e.g. first user)
       let isAdminNow = false;
-
-      if (showAdminSection) {
-        // User clicked "Ingia kama Admin" -- try claimAdminIfNoneYet first
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const claimed = await (actor as any).claimAdminIfNoneYet();
-          if (claimed) isAdminNow = true;
-        } catch {
-          // not critical, fall through
-        }
-      }
-
-      if (!isAdminNow) {
-        // Check if we became admin (e.g. first user)
-        try {
-          isAdminNow = await actor.isCallerAdmin();
-        } catch {
-          // ignore
-        }
+      try {
+        isAdminNow = await actor.isCallerAdmin();
+      } catch {
+        // ignore
       }
 
       // Upload profile picture if provided
@@ -251,74 +235,19 @@ export function ProfileSetup() {
             </div>
           </div>
 
-          {/* Admin Section Toggle */}
-          <div
-            className="rounded-xl border overflow-hidden"
-            style={{ borderColor: "hsl(var(--border))" }}
-          >
-            <button
-              type="button"
-              data-ocid="profile_setup.admin.toggle"
-              onClick={() => setShowAdminSection((v) => !v)}
-              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-colors"
-              style={{
-                background: showAdminSection
-                  ? "hsl(var(--muted))"
-                  : "transparent",
-                color: "hsl(var(--muted-foreground))",
-              }}
-            >
-              <span className="flex items-center gap-2">
-                <span>🛡️</span>
-                <span>Ingia kama Admin / Become Admin</span>
-              </span>
-              {showAdminSection ? (
-                <ChevronUp size={14} />
-              ) : (
-                <ChevronDown size={14} />
-              )}
-            </button>
-
-            {showAdminSection && (
-              <div
-                className="px-4 pb-4 pt-2 space-y-2"
-                style={{ background: "hsl(var(--muted) / 0.4)" }}
-              >
-                <p
-                  className="text-xs leading-snug rounded-lg px-3 py-2"
-                  style={{
-                    background: "hsl(var(--muted))",
-                    color: "hsl(var(--foreground))",
-                    borderLeft: "3px solid #7c3aed",
-                  }}
-                >
-                  ✅ Ukibonyeza &ldquo;🛡️ Sajili kama Admin&rdquo; mfumo
-                  utajaribu kukupa haki za Admin kama hakuna admin mwingine
-                  aliyesajiliwa &mdash; bila kuhitaji neno la siri lolote.
-                </p>
-              </div>
-            )}
-          </div>
-
           <Button
             onClick={submit}
             disabled={saving}
             className="w-full font-semibold py-5 rounded-xl"
             data-ocid="profile_setup.submit.primary_button"
             style={{
-              background: showAdminSection
-                ? "linear-gradient(135deg, #4f1d96, #7c3aed)"
-                : "linear-gradient(135deg, #C2185B, #FF00AA)",
+              background: "linear-gradient(135deg, #C2185B, #FF00AA)",
               color: "#fff",
               border: "none",
             }}
           >
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {saving
-              ? "Inasajili..."
-              : showAdminSection
-                ? "🛡️ Sajili kama Admin"
-                : "Endelea / Continue"}
+            {saving ? "Inasajili..." : "Endelea / Continue"}
           </Button>
         </div>
       </div>
