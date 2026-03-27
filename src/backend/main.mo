@@ -7,14 +7,10 @@ import Int "mo:core/Int";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
 import Order "mo:core/Order";
-
-
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
-
-
 actor {
   include MixinStorage();
 
@@ -735,8 +731,6 @@ actor {
     };
     orders.values().toArray().sort(func(a, b) { Nat.compare(a.id, b.id) });
   };
-
-
   public query ({ caller }) func getShopsByCategory(category : Text) : async [ShopWithAvailability] {
     shops.values().toArray().filter(func(shop) { switch (shopCategories.get(shop.id)) { case (?c) { c == category }; case (null) { false } } }).map(withAvailability);
   };
@@ -996,7 +990,5 @@ actor {
     accessControlState.adminAssigned := true;
     true
   };
-
-
 };
 
