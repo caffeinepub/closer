@@ -204,7 +204,7 @@ actor {
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
+      return null;
     };
     userProfiles.get(caller);
   };
@@ -218,7 +218,7 @@ actor {
 
   public query ({ caller }) func getAllUserProfiles() : async [(Principal, UserProfile)] {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admin can view all user profiles");
+      return [];
     };
     userProfiles.toArray();
   };
@@ -264,7 +264,7 @@ actor {
 
   public query ({ caller }) func getMyProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
+      return null;
     };
     userProfiles.get(caller);
   };
@@ -702,21 +702,21 @@ actor {
 
   public query ({ caller }) func getMyNotifications() : async [Notification] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view notifications");
+      return [];
     };
     notifications.values().toArray().filter(func(notification) { notification.ownerId == caller }).sort();
   };
 
   public query ({ caller }) func getMyOrders() : async [Order] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view orders");
+      return [];
     };
     orders.values().toArray().filter(func(order) { order.customerId == caller }).sort(func(a, b) { Nat.compare(a.id, b.id) });
   };
 
   public query ({ caller }) func getShopOrders(shopId : Nat) : async [Order] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view shop orders");
+      return [];
     };
     switch (shops.get(shopId)) {
       case (null) { Runtime.trap("Shop does not exist") };
@@ -770,7 +770,7 @@ actor {
 
   public query ({ caller }) func getOrder(orderId : Nat) : async ?Order {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view order details");
+      return null;
     };
     switch (orders.get(orderId)) {
       case (null) { null };
