@@ -4,7 +4,6 @@ import type {
   AppSettings,
   Notification,
   Order,
-  PaymentReference,
   Product,
   Shop,
   UserProfile,
@@ -153,30 +152,6 @@ export function useAppSettings() {
       return actor.getAppSettings();
     },
     enabled: !!actor && !isFetching,
-  });
-}
-
-export function usePendingReferences() {
-  const { actor, isFetching } = useActor();
-  return useQuery<PaymentReference[]>({
-    queryKey: ["pendingReferences"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getPendingReferences();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useMyReferences(shopId: bigint | null) {
-  const { actor, isFetching } = useActor();
-  return useQuery<PaymentReference[]>({
-    queryKey: ["myReferences", shopId?.toString()],
-    queryFn: async () => {
-      if (!actor || shopId === null) return [];
-      return actor.getMyReferences(shopId);
-    },
-    enabled: !!actor && !isFetching && shopId !== null,
   });
 }
 
@@ -542,24 +517,6 @@ export function useDeleteProduct() {
   });
 }
 
-export function useSubmitSubscriptionReference() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      shopId,
-      referenceNumber,
-    }: { shopId: bigint; referenceNumber: string }) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.submitSubscriptionReference(shopId, referenceNumber);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["myReferences"] });
-      qc.invalidateQueries({ queryKey: ["pendingReferences"] });
-    },
-  });
-}
-
 export function useUpdateAppSettings() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -569,34 +526,6 @@ export function useUpdateAppSettings() {
       return actor.updateAppSettings(platformPaymentNumber);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["appSettings"] }),
-  });
-}
-
-export function useApproveSubscriptionReference() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (referenceId: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.approveSubscriptionReference(referenceId);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pendingReferences"] });
-      qc.invalidateQueries({ queryKey: ["shops"] });
-      qc.invalidateQueries({ queryKey: ["activeShops"] });
-    },
-  });
-}
-
-export function useRejectSubscriptionReference() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (referenceId: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.rejectSubscriptionReference(referenceId);
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["pendingReferences"] }),
   });
 }
 

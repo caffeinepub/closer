@@ -254,6 +254,40 @@ function ShopCard({
   );
 }
 
+function getCategoryBannerGradient(category: string): string {
+  const cat = (category || "").toLowerCase();
+  if (cat.includes("welding") || cat.includes("useremala")) {
+    return "linear-gradient(135deg, oklch(0.65 0.18 45), oklch(0.55 0.2 30))";
+  }
+  if (cat.includes("soko") || cat.includes("market")) {
+    return "linear-gradient(135deg, oklch(0.55 0.18 145), oklch(0.45 0.2 160))";
+  }
+  if (
+    cat.includes("chipsi") ||
+    cat.includes("fast food") ||
+    cat.includes("food")
+  ) {
+    return "linear-gradient(135deg, oklch(0.75 0.18 80), oklch(0.65 0.2 50))";
+  }
+  if (cat.includes("nyama") || cat.includes("choma") || cat.includes("meat")) {
+    return "linear-gradient(135deg, oklch(0.55 0.18 20), oklch(0.45 0.15 35))";
+  }
+  return "linear-gradient(135deg, oklch(0.55 0.22 290), oklch(0.5 0.25 320))";
+}
+
+function getCategoryBadgeColor(category: string): string {
+  const cat = (category || "").toLowerCase();
+  if (cat.includes("welding") || cat.includes("useremala"))
+    return "oklch(0.6 0.18 45)";
+  if (cat.includes("soko") || cat.includes("market"))
+    return "oklch(0.5 0.18 145)";
+  if (cat.includes("chipsi") || cat.includes("fast food"))
+    return "oklch(0.65 0.18 65)";
+  if (cat.includes("nyama") || cat.includes("choma"))
+    return "oklch(0.5 0.15 25)";
+  return "oklch(0.52 0.22 295)";
+}
+
 function ShopModal({
   shop,
   onClose,
@@ -296,27 +330,74 @@ function ShopModal({
           borderColor: "hsl(var(--border))",
         }}
       >
-        <DialogHeader>
-          <DialogTitle style={{ color: "hsl(var(--card-foreground))" }}>
-            <div className="flex items-center gap-3">
-              <ShopAvatar shop={shop} size={64} />
-              <div>
-                <p className="font-bold text-lg">{shop.name}</p>
-                {distance !== null && (
-                  <div
-                    className="flex items-center gap-1 text-sm mt-0.5"
-                    style={{ color: "hsl(var(--primary))" }}
-                  >
-                    <Navigation size={13} />
-                    <span className="font-semibold">
-                      {formatDistance(distance)} kutoka kwako
-                    </span>
-                  </div>
-                )}
+        {/* Shop Banner Header */}
+        <div className="-mx-6 -mt-6 mb-4">
+          <div
+            className="relative h-32 flex items-end justify-center pb-0"
+            style={{
+              background: getCategoryBannerGradient(
+                (shop as any).category || "",
+              ),
+            }}
+          >
+            {/* Decorative pattern overlay */}
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
+                backgroundSize: "30px 30px",
+              }}
+            />
+            {/* Active badge */}
+            {shop.isActive && (
+              <div className="absolute top-3 right-3 flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
+                <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+                <span className="text-white text-xs font-medium">Active</span>
+              </div>
+            )}
+            {/* Avatar overlapping bottom */}
+            <div className="absolute -bottom-9 left-1/2 -translate-x-1/2">
+              <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden border-4 border-white shadow-lg bg-white">
+                <ShopAvatar shop={shop} size={72} />
               </div>
             </div>
-          </DialogTitle>
-        </DialogHeader>
+          </div>
+          {/* Name & meta below banner */}
+          <div className="pt-12 pb-1 px-6 text-center">
+            <DialogHeader>
+              <DialogTitle style={{ color: "hsl(var(--card-foreground))" }}>
+                <p className="font-bold text-xl leading-tight">{shop.name}</p>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-center gap-2 mt-1 flex-wrap">
+              {(shop as any).category && (
+                <span
+                  className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                  style={{
+                    background: getCategoryBadgeColor(
+                      (shop as any).category || "",
+                    ),
+                    color: "white",
+                  }}
+                >
+                  {(shop as any).category}
+                </span>
+              )}
+              {distance !== null && (
+                <div
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "hsl(var(--primary))" }}
+                >
+                  <Navigation size={11} />
+                  <span className="font-semibold">
+                    {formatDistance(distance)} kutoka kwako
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Shop info */}
         <div className="space-y-2">

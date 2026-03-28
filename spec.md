@@ -1,28 +1,29 @@
 # Closer to Market
 
 ## Current State
-Marketplace app with shops, products, orders, and admin panel. No feedback or rating system exists.
+- Full marketplace app with shop browsing, product management, orders, admin panel
+- Frontend calls several old payment/subscription backend functions that were removed from main.mo: `submitSubscriptionReference`, `getPendingReferences`, `getMyReferences`, `approveSubscriptionReference`, `rejectSubscriptionReference` — these cause runtime errors
+- App.tsx calls `_initializeAccessControlWithSecret` which requires CAFFEINE_ADMIN_TOKEN env var and can trap
+- ShopModal shows shops in a dialog with a simple avatar + name header, no visual banner
+- isCallerAdmin exists via MixinAuthorization mixin (included in actor)
 
 ## Requested Changes (Diff)
 
 ### Add
-- `AppFeedback` type in backend: id, userId, userName, rating (1-5), comment, timestamp
-- `submitAppFeedback(rating, comment)` backend function (registered users only)
-- `getAppFeedbacks()` backend query (public)
-- `getAverageRating()` backend query returning average rating and count
-- Frontend: Feedback section in LandingPage footer area -- star rating input + comment textarea + submit button
-- Frontend: Display average rating with star icons and total count on landing page
-- Frontend: List of recent feedback visible on landing page below the rating form
+- Shop banner/header ("hat kwa duka maalum"): colorful gradient header at top of each ShopModal with shop logo, name, category badge, and active status indicator
 
 ### Modify
-- `backend.d.ts` -- add `AppFeedback` interface and new function signatures
-- `LandingPage.tsx` -- add feedback/rating section
+- Remove all calls to non-existent payment functions from useQueries.ts: delete `useSubmitSubscriptionReference`, `useApproveSubscriptionReference`, `useRejectSubscriptionReference`, `usePendingReferences`, `useMyReferences` hooks since their backend counterparts don't exist
+- Clean App.tsx: remove the `_initializeAccessControlWithSecret` call (which requires env var and can fail), rely only on `claimAdminIfNoneYet` for auto-admin
+- Fix any references to the removed hooks in AdminPanel and ShopOwnerDashboard
 
 ### Remove
-- Nothing removed
+- Dead code for payment/subscription functions in useQueries.ts
+- `_initializeAccessControlWithSecret` call in App.tsx
 
 ## Implementation Plan
-1. Add `AppFeedback` type and `nextFeedbackId`, `feedbacks` map to backend
-2. Add `submitAppFeedback`, `getAppFeedbacks`, `getAverageRating` functions
-3. Update `backend.d.ts` with new types and functions
-4. Add FeedbackSection component to LandingPage with star rating, comment input, submit, and feedback list
+1. Update useQueries.ts: delete the 5 dead payment hooks
+2. Update App.tsx: remove `_initializeAccessControlWithSecret` effect, keep only `claimAdminIfNoneYet`
+3. Update AdminPanel.tsx: remove any usage of `usePendingReferences`, `useApproveSubscriptionReference`, `useRejectSubscriptionReference`
+4. Update ShopOwnerDashboard.tsx: remove any usage of `useMyReferences`, `useSubmitSubscriptionReference`
+5. Add shop banner header to ShopModal in ShopBrowser.tsx: gradient banner using shop category color, shop logo centered, name + category overlay
