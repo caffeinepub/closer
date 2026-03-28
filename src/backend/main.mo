@@ -7,6 +7,7 @@ import Int "mo:core/Int";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
 import Order "mo:core/Order";
+
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Storage "blob-storage/Storage";
@@ -139,6 +140,16 @@ actor {
     submittedAt : Int;
   };
 
+
+  public type AppFeedback = {
+    id : Nat;
+    userId : Principal;
+    userName : Text;
+    rating : Nat;
+    comment : Text;
+    timestamp : Int;
+  };
+
   var nextShopId = 1;
   var nextProductId = 1;
   var nextOrderId = 1;
@@ -153,6 +164,8 @@ actor {
   let orders = Map.empty<Nat, Order>();
   let notifications = Map.empty<Nat, Notification>();
   let paymentReferences = Map.empty<Nat, PaymentReference>();
+  var nextFeedbackId = 1;
+  let feedbacks = Map.empty<Nat, AppFeedback>();
 
   var appSettings : AppSettings = {
     platformPaymentNumber = "16334291";
@@ -785,6 +798,40 @@ actor {
 
   public query ({ caller }) func getActiveShops() : async [ShopWithAvailability] {
     shops.values().toArray().filter(func(shop) { shop.isActive }).map(withAvailability);
+  };
+
+  public shared ({ caller }) func submitAppFeedback(rating : Nat, comment : Text) : async Nat {
+    if (caller.isAnonymous()) { Runtime.trap("Anonymous users cannot submit feedback") };
+    if (rating < 1 or rating > 5) { Runtime.trap("Rating must be between 1 and 5") };
+    let userName = switch (userProfiles.get(caller)) {
+      case (?profile) { profile.name };
+      case (null) { "Mtumiaji" };
+    };
+    let id = nextFeedbackId;
+    nextFeedbackId += 1;
+    feedbacks.add(id, {
+      id;
+      userId = caller;
+      userName;
+      rating;
+      comment;
+      timestamp = Time.now();
+    });
+    id
+  };
+
+  public query func getAppFeedbacks() : async [AppFeedback] {
+    feedbacks.values().toArray().sort(func(a, b) { Int.compare(b.timestamp, a.timestamp) })
+  };
+
+  // Returns (totalRatingX10, count) to avoid Float -- frontend divides by 10 to get average
+  public query func getAverageRating() : async (Nat, Nat) {
+    let all = feedbacks.values().toArray();
+    let count = all.size();
+    if (count == 0) { return (0, 0) };
+    var total = 0;
+    for (fb in all.vals()) { total += fb.rating };
+    (total * 10 / count, count)
   };
 
   // Allows anyone to claim admin if no admin has been assigned yet.

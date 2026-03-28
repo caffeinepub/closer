@@ -69,6 +69,14 @@ export interface PaymentReference {
     submittedAt: bigint;
     shopName: string;
 }
+export interface AppFeedback {
+    id: bigint;
+    userId: Principal;
+    userName: string;
+    rating: bigint;
+    comment: string;
+    timestamp: bigint;
+}
 export interface UserProfile {
     name: string;
     email: string;
@@ -135,6 +143,9 @@ export interface backendInterface {
     updateShopLogo(shopId: bigint, shopLogo: ExternalBlob): Promise<void>;
     updateShopPaymentNumbers(shopId: bigint, paymentNumbers: string): Promise<void>;
     uploadPaymentProof(orderId: bigint, paymentProof: ExternalBlob, paymentNote: string): Promise<void>;
+    submitAppFeedback(rating: bigint, comment: string): Promise<bigint>;
+    getAppFeedbacks(): Promise<Array<AppFeedback>>;
+    getAverageRating(): Promise<[bigint, bigint]>;
     claimAdminIfNoneYet(): Promise<boolean>;
     forceResetAndClaimAdmin(secret: string): Promise<boolean>;
     promoteUserToAdmin(user: Principal): Promise<void>;

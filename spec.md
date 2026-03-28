@@ -1,20 +1,28 @@
 # Closer to Market
 
 ## Current State
-App ina backend ya Motoko na frontend ya React. Tatizo kuu: `getUserRole` katika `access-control.mo` ilifanya `Runtime.trap` kwa watumiaji wasiojulikana badala ya kurudisha `#guest`. Hii ilisababisha "Hitilafu" kila mtumiaji asiyeandikishwa alipojaribu kufanya kitu chochote.
+Marketplace app with shops, products, orders, and admin panel. No feedback or rating system exists.
 
 ## Requested Changes (Diff)
 
 ### Add
-- (hakuna)
+- `AppFeedback` type in backend: id, userId, userName, rating (1-5), comment, timestamp
+- `submitAppFeedback(rating, comment)` backend function (registered users only)
+- `getAppFeedbacks()` backend query (public)
+- `getAverageRating()` backend query returning average rating and count
+- Frontend: Feedback section in LandingPage footer area -- star rating input + comment textarea + submit button
+- Frontend: Display average rating with star icons and total count on landing page
+- Frontend: List of recent feedback visible on landing page below the rating form
 
 ### Modify
-- `access-control.mo`: `getUserRole` sasa inarudisha `#guest` badala ya `Runtime.trap` kwa watumiaji wasiojulikana
-- `hasPermission` imeboreshwa kutumia switch badala ya equality checks
+- `backend.d.ts` -- add `AppFeedback` interface and new function signatures
+- `LandingPage.tsx` -- add feedback/rating section
 
 ### Remove
-- `Runtime.trap("User is not registered")` -- hii ndiyo ilikuwa chanzo cha hitilafu zote
+- Nothing removed
 
 ## Implementation Plan
-1. Fix `access-control.mo` - imekamilika
-2. Deploy
+1. Add `AppFeedback` type and `nextFeedbackId`, `feedbacks` map to backend
+2. Add `submitAppFeedback`, `getAppFeedbacks`, `getAverageRating` functions
+3. Update `backend.d.ts` with new types and functions
+4. Add FeedbackSection component to LandingPage with star rating, comment input, submit, and feedback list
