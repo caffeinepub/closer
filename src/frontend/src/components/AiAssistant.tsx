@@ -16,85 +16,358 @@ function getTime() {
   });
 }
 
+// ─── Smart AI Engine ───────────────────────────────────────────────────────────
+
+function tryMath(input: string): string | null {
+  // Evaluate simple arithmetic
+  const cleaned = input
+    .replace(/x/gi, "*")
+    .replace(/÷/g, "/")
+    .replace(/[^0-9+\-*/().\s]/g, "")
+    .trim();
+  if (!cleaned || !/[0-9]/.test(cleaned)) return null;
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function(`"use strict"; return (${cleaned})`)();
+    if (typeof result === "number" && Number.isFinite(result)) {
+      return `Jibu: **${cleaned} = ${result.toLocaleString()}**`;
+    }
+  } catch {
+    // not a math expression
+  }
+  return null;
+}
+
+const knowledge: Array<{ keys: string[]; answer: string }> = [
+  // ── Greetings ──
+  {
+    keys: [
+      "habari",
+      "hujambo",
+      "mambo",
+      "vipi",
+      "salamu",
+      "hello",
+      "hi",
+      "hey",
+      "good morning",
+      "good afternoon",
+      "good evening",
+      "karibu",
+    ],
+    answer:
+      "Habari! Karibu sana 😊. Mimi ni Msaidizi wa CTM -- ninaweza kukusaidia kuhusu biashara, malipo, maagizo, kilimo, afya, teknolojia, fedha, na maswali mengine mengi. Unauliza nini leo?",
+  },
+  {
+    keys: ["asante", "shukrani", "thank you", "thanks"],
+    answer: "Karibu sana! Ikiwa una swali lingine lolote, mimi niko hapa 😊.",
+  },
+  {
+    keys: ["kwaheri", "baadaye", "goodbye", "bye", "tutaonana"],
+    answer:
+      "Kwaheri! Nakutakia biashara nzuri na siku njema 🌟. Rudi wakati wowote ukihitaji msaada.",
+  },
+
+  // ── App / CTM ──
+  {
+    keys: [
+      "malipo",
+      "payment",
+      "kulipa",
+      "lipa",
+      "pesa",
+      "m-pesa",
+      "mpesa",
+      "tigo",
+      "airtel",
+      "halopesa",
+    ],
+    answer:
+      "💳 **Malipo kwenye CTM:**\nTazama namba ya malipo ya duka (kisanduku cha kijani ndani ya duka). Unaweza kulipa kupitia:\n• M-Pesa\n• Tigo Pesa\n• Airtel Money\n• HaloPesa\n• Njia yoyote inayokubaliwa na mwenye duka.\n\nBaada ya kulipa, mwambie mwenye duka namba yako ya malipo ili athibitishe na kuandaa bidhaa yako.",
+  },
+  {
+    keys: ["agizo", "order", "nunua", "oda", "niagize"],
+    answer:
+      "📦 **Jinsi ya Kuagiza:**\n1. Nenda Soko → chagua kundi la biashara.\n2. Bonyeza duka/bidhaa unayoipenda.\n3. Bonyeza **'Agiza Sasa'**.\n4. Taarifa zako (jina + simu) zitatumwa kwa mwenye duka moja kwa moja.\n5. Mwenye duka atakupigia simu ili kuthibitisha na kukuambia jinsi ya kupokea bidhaa.",
+  },
+  {
+    keys: [
+      "duka",
+      "shop",
+      "biashara",
+      "register shop",
+      "unda duka",
+      "fungua duka",
+    ],
+    answer:
+      "🏪 **Jinsi ya Kufungua Duka:**\n1. Nenda **Ofisi Yangu**.\n2. Bonyeza **'Unda Duka Jipya'**.\n3. Chagua kundi la biashara yako (Welding, Soko, Chipsi, n.k.).\n4. Jaza taarifa: jina, maelezo, namba ya malipo, na picha ya logo.\n5. Bonyeza **Hifadhi** -- duka lako litaonekana mara moja BILA malipo yoyote!",
+  },
+  {
+    keys: ["admin", "mamlaka", "daka admin"],
+    answer:
+      "🔑 **Kupata Haki za Admin:**\nNenda **Ofisi Yangu → ⚙️ Mipangilio**, kisha bonyeza **'Daka Admin'** (ikiwa hakuna admin mwingine) au **'Futa Admin wa Zamani'** (msimbo: `ctm2026`).\n\nMtumiaji wa **kwanza** kusajili kwenye app huwa Admin moja kwa moja.",
+  },
+  {
+    keys: ["hitilafu", "error", "shida ya app", "inagoma", "haifanyi kazi"],
+    answer:
+      "🔧 **Jinsi ya Kurekebisha Hitilafu:**\n1. Toka (Logout) kisha ingia tena.\n2. Pakua upya ukurasa (Refresh / F5).\n3. Hakikisha umeingiza taarifa zote zinazohitajika.\n4. Jaribu kwenye kivinjari kingine (Chrome / Firefox).\n5. Ikiwa shida inaendelea, subiri dakika chache kisha jaribu tena.",
+  },
+  {
+    keys: ["notification", "arifa", "sauti", "sound"],
+    answer:
+      "🔔 **Arifa:**\nMwenye duka anapokea arifa kila mtu akiagiza bidhaa yake -- pamoja na jina na simu ya mteja.\nUnaweza kuchagua sauti ya arifa kwenye ⚙️ **Mipangilio** (Beep, Bell, Chime, au Double).",
+  },
+  {
+    keys: ["pwa", "install", "weka app", "download app", "offline"],
+    answer:
+      "📱 **Kuweka App kwenye Simu:**\n**Android (Chrome):**\n1. Fungua app kwenye Chrome.\n2. Bonyeza menu (⋮) → **'Add to Home Screen'**.\n\n**iPhone (Safari):**\n1. Bonyeza kitufe cha Share (🔗).\n2. Chagua **'Add to Home Screen'**.\n\nApp itafanya kazi kama app ya kawaida -- hata bila mtandao!",
+  },
+
+  // ── Tanzania / Geography ──
+  {
+    keys: ["tanzania", "dar es salaam", "dodoma", "mkoa", "mji"],
+    answer:
+      "🇹🇿 **Tanzania:**\nTanzania ni nchi ya Afrika Mashariki. Mji mkuu ni **Dodoma** (kiutawala) na **Dar es Salaam** ni mji mkubwa zaidi kibiashara.\nIdadi ya watu: ~65 milioni. Sarafu: **Shilingi ya Tanzania (TZS)**. Lugha rasmi: Kiswahili na Kiingereza.",
+  },
+  {
+    keys: ["kilimanjaro", "mlima"],
+    answer:
+      "🏔️ **Mlima Kilimanjaro** ndio mlima mrefu zaidi barani Afrika -- urefu wake ni mita 5,895 juu ya usawa wa bahari. Upo kaskazini mwa Tanzania, karibu na mji wa Moshi.",
+  },
+
+  // ── Biashara / Business ──
+  {
+    keys: ["jinsi ya kuuza", "marketing", "wateja", "ongeza wateja", "masoko"],
+    answer:
+      "📈 **Vidokezo vya Kuongeza Mauzo:**\n1. **Piga picha nzuri** za bidhaa zako.\n2. **Andika bei wazi** -- wateja hupenda uwazi.\n3. **Jibu haraka** -- mteja asiyejibiwa hukimbia.\n4. **Tuma bei ya sawa** au punguzo kwa wateja wa mara kwa mara.\n5. **Tumia mitandao ya jamii** -- TikTok, Facebook, WhatsApp kwa matangazo ya bure.\n6. **Weka duka lako active** ili liendelee kuonekana kwa wateja.",
+  },
+  {
+    keys: ["faida", "hasara", "biashara inafanya", "mapato", "kipato"],
+    answer:
+      "💰 **Kuhesabu Faida:**\nFaida = Mapato ya Jumla − Gharama Zote\n\n**Mfano:**\n• Uliuza bidhaa: TZS 50,000\n• Gharama ya kununua: TZS 30,000\n• Usafiri/packing: TZS 2,000\n• **Faida halisi: TZS 18,000**\n\nKumbuka kuweka kumbukumbu ya kila muamala ili usipoteze hesabu.",
+  },
+  {
+    keys: ["biashara ndogo", "startup", "kuanza biashara", "mtaji"],
+    answer:
+      "🚀 **Kuanza Biashara Ndogo:**\n1. **Chagua bidhaa/huduma** inayohitajika sana eneo lako.\n2. **Anza na mtaji mdogo** -- usisubiri pesa nyingi.\n3. **Sajili biashara** yako kwenye serikali (BRELA Tanzania).\n4. **Weka akaunti ya benki** tofauti na ya kibinafsi.\n5. **Tafuta wateja 10 wa kwanza** -- ndiyo hatua ngumu zaidi lakini muhimu sana.\n6. **Ongeza CTM** -- weka duka lako hapa bure!",
+  },
+
+  // ── Kilimo / Agriculture ──
+  {
+    keys: ["kilimo", "shamba", "mazao", "zao", "mbegu", "rutuba", "mbolea"],
+    answer:
+      "🌾 **Kilimo Bora:**\n• **Mbolea ya asili (mboji)** ni bora kuliko kemikali -- inapunguza gharama na kulinda ardhi.\n• **Umwagiliaji** wa kutosha unaongeza mavuno hadi mara 3.\n• **Zao bora Tanzania:** mahindi, mpunga, mihogo, nyanya, vitunguu, kahawa, korosho.\n• **Tahadhari ya wadudu:** Tumia dawa za asili au nenda kituo cha kilimo kilicho karibu.\n• **Mazao ya msimu:** Panda wakati wa mvua ili kupunguza gharama za maji.",
+  },
+  {
+    keys: ["mifugo", "ng'ombe", "kuku", "mbuzi", "nguruwe"],
+    answer:
+      "🐄 **Ufugaji:**\n• **Kuku wa nyama (broiler):** Anakomaa ndani ya siku 42. Faida nzuri kwa mtaji mdogo.\n• **Kuku wa mayai:** Anaanza kutaga baada ya miezi 5. Mayai yanapata soko zuri.\n• **Ng'ombe wa maziwa:** Anahitaji chakula bora, chanjo, na maji safi. Mazao: maziwa, nyama, mbolea.\n• **Mbuzi:** Rahisi kufuga, anapendeza soko la nyama na maziwa.\n• Wasiliana na **Wizara ya Mifugo Tanzania** kwa msaada wa bure.",
+  },
+
+  // ── Afya / Health ──
+  {
+    keys: ["afya", "magonjwa", "dawa", "hospitali", "homa", "malaria"],
+    answer:
+      "🏥 **Afya ya Msingi:**\n• **Homa ya malaria:** Dalili -- homa, maumivu ya kichwa, baridi. Nenda hospitali haraka kwa kipimo.\n• **Maji safi:** Chemsha maji au tumia dawa za kusafisha kuepuka kipindupindu na kuhara.\n• **Chanjo:** Hakikisha watoto wanachanjwa kwa wakati -- zinaokoa maisha.\n• **Lishe bora:** Kula matunda, mboga, protini na wanga kila siku.\n\n⚠️ Kwa dharura ya kiafya, piga simu **114** (muhutasari Tanzania) au nenda hospitali ya karibu mara moja.",
+  },
+  {
+    keys: ["corona", "covid", "virusi"],
+    answer:
+      "😷 **Tahadhari za Virusi:**\n• Osha mikono mara kwa mara kwa sabuni na maji.\n• Epuka msongamano wa watu mahali pasipo na uingizaji hewa.\n• Nenda hospitali ukipata dalili za kupumua vibaya, homa kali, au kupoteza hisi ya harufu.",
+  },
+
+  // ── Teknolojia / Technology ──
+  {
+    keys: ["internet", "mtandao", "wifi", "data", "mb", "gb"],
+    answer:
+      "📶 **Kuokoa Data ya Intaneti:**\n• Zima updates za kiotomatiki kwenye simu.\n• Tumia WiFi nyumbani au mahali pa kazi.\n• Pakua muziki/video ukiwa na WiFi ili uone offline.\n• Tumia vivinjari vinavyookoa data kama **Opera Mini** au **Chrome Data Saver**.",
+  },
+  {
+    keys: ["simu", "phone", "smartphone", "android", "iphone"],
+    answer:
+      "📱 **Vidokezo vya Simu:**\n• Bonyeza **Settings → Battery** ili uone programu zinazotumia betri nyingi.\n• Hifadhi nakala (backup) ya picha zako kwenye Google Photos (bure).\n• Sasisha programu zako mara kwa mara ili kupata usalama bora.\n• Usitumie hotspot ya WiFi ya bure mahali pa umma kwa shughuli za benki.",
+  },
+  {
+    keys: ["kompyuta", "laptop", "computer", "pc"],
+    answer:
+      "💻 **Kompyuta:**\n• Weka **antivirus** (Windows Defender ni bure na ni bora).\n• Hifadhi kazi zako kwenye **Google Drive** au **OneDrive** ili usipoteze.\n• Weka nenosiri imara: herufi kubwa + ndogo + nambari + alama (mfano: `Market@2026`).\n• Sasisha mfumo (Windows Update) mara kwa mara.",
+  },
+
+  // ── Fedha / Finance ──
+  {
+    keys: ["akiba", "benki", "akaunti", "kuweka pesa", "faida ya benki"],
+    answer:
+      "🏦 **Jinsi ya Kuweka Akiba:**\n• **CRDB, NMB, NBC** -- benki kubwa Tanzania zenye akaunti za kawaida.\n• **SACCOS** -- vikundi vya akiba vinavyotoa mkopo kwa riba ndogo.\n• **M-Pesa/Tigo Pesa** -- rahisi kuhifadhi pesa kidogo kidogo.\n• Jaribu kuweka **10-20% ya mapato** yako kila mwezi kwa ajili ya hali ya dharura.",
+  },
+  {
+    keys: ["mkopo", "loan", "kukopa", "riba"],
+    answer:
+      "💵 **Kuhusu Mikopo:**\n• Kabla ya kukopa, hakikisha una mpango wa kurejesha.\n• Linganisha riba za benki tofauti -- tofauti inaweza kuwa kubwa.\n• **SIDO** na **NEEC** Tanzania wanatoa mikopo kwa biashara ndogo ndogo.\n• Epuka 'fasta loans' zenye riba juu ya 10% kwa mwezi -- zinaweza kukuzalisha deni kubwa.",
+  },
+  {
+    keys: ["inflation", "mfumuko", "bei kupanda", "gharama ya maisha"],
+    answer:
+      "📊 **Mfumuko wa Bei:**\nMfumuko wa bei unamaanisha pesa inakuwa na thamani ndogo na bidhaa zinaghali zaidi. Jinsi ya kujilinda:\n• Nunua bidhaa kwa wingi (bulk) unapopata bei nzuri.\n• Wekeza kwenye biashara au mali badala ya kushikilia pesa za taslimu.\n• Fuata taarifa za Benki Kuu ya Tanzania (BOT) kuhusu hali ya uchumi.",
+  },
+
+  // ── Elimu / Education ──
+  {
+    keys: ["elimu", "shule", "chuo", "university", "mtihani", "darasa"],
+    answer:
+      "🎓 **Elimu Tanzania:**\n• **Vyuo vikuu:** UDSM, UDOM, Mzumbe, Ardhi, Sokoine, St. Augustine.\n• **Mitihani ya taifa:** NECTA -- PSLE, CSEE (Form 4), ACSEE (Form 6).\n• **Masomo ya bure online:** Khan Academy, YouTube, Coursera.\n• **Udaholo (scholarship):** HESLB hutoa mikopo kwa wanafunzi wa chuo.",
+  },
+
+  // ── Mazingira / Environment ──
+  {
+    keys: ["hali ya hewa", "mvua", "joto", "baridi", "msimu", "weather"],
+    answer:
+      "🌤️ **Hali ya Hewa Tanzania:**\n• **Msimu wa mvua kuu (Masika):** Machi -- Mei.\n• **Msimu wa mvua ndogo (Vuli):** Oktoba -- Desemba.\n• **Msimu wa kiangazi:** Juni -- Agosti (baridi zaidi maeneo ya juu).\n• Kwa taarifa za hali ya hewa, angalia **TMA (Tanzania Meteorological Authority)** au tovuti ya weather.com.",
+  },
+
+  // ── Haki / Sheria ──
+  {
+    keys: ["haki", "sheria", "polisi", "korti", "malalamiko", "rights"],
+    answer:
+      "⚖️ **Haki za Msingi Tanzania:**\n• Una haki ya kupata mwanasheria ukikamatwa.\n• Shirika la **Msaada wa Kisheria Tanzania (LST)** linatoa ushauri wa bure.\n• Lalamika ulaghai wa kidigitali kwa **TCRA** (www.tcra.go.tz) au **Polisi ya Mawasiliano (PCCB)**.",
+  },
+  {
+    keys: ["brela", "TIN", "usajili biashara", "leseni"],
+    answer:
+      "📋 **Usajili wa Biashara Tanzania:**\n1. **BRELA** (Business Registrations and Licensing Agency) -- sajili jina la biashara.\n2. **TRA** -- pata TIN number (bure online kwa ors.tra.go.tz).\n3. **Leseni ya biashara** -- nenda Halmashauri yako ya Wilaya.\n4. **OSHA** -- kama una wafanyakazi, hakikisha unazingatia afya na usalama mahali pa kazi.",
+  },
+
+  // ── Jiografia / General Knowledge ──
+  {
+    keys: ["africa", "bara la africa", "nchi za africa"],
+    answer:
+      "🌍 **Afrika:**\nAfrika ni bara kubwa zaidi duniani kwa upande wa nchi -- ina nchi **54**. Idadi ya watu: takriban **1.4 bilioni**. Lugha za kawaida zaidi: Kiswahili, Kiingereza, Kifaransa, Kiarabu. Uchumi mkubwa: Nigeria, Afrika Kusini, Misri, Kenya, Tanzania.",
+  },
+  {
+    keys: ["dunia", "world", "continents", "mabara"],
+    answer:
+      "🌐 **Mabara ya Dunia (7):**\n1. Asia (kubwa zaidi)\n2. Afrika\n3. Amerika Kaskazini\n4. Amerika Kusini\n5. Antaktika (baridi zaidi)\n6. Ulaya\n7. Australia/Oceania\n\nIdadi ya watu duniani: ~8 bilioni.",
+  },
+  {
+    keys: [
+      "capital",
+      "mji mkuu",
+      "nairobi",
+      "kampala",
+      "kigali",
+      "addis",
+      "cairo",
+    ],
+    answer:
+      "🏙️ **Miji Mikuu ya Afrika Mashariki:**\n• Tanzania: **Dodoma**\n• Kenya: **Nairobi**\n• Uganda: **Kampala**\n• Rwanda: **Kigali**\n• Burundi: **Gitega**\n• Ethiopia: **Addis Ababa**",
+  },
+
+  // ── Sayansi / Science ──
+  {
+    keys: ["gesi asilia", "mafuta", "madini", "gold", "dhahabu", "tanzanite"],
+    answer:
+      "💎 **Madini ya Tanzania:**\n• **Tanzanite** -- inachimbwa Mererani tu duniani kote (Tanzania peke yake!).\n• **Dhahabu (gold)** -- machimbo makubwa: Geita, North Mara, Bulyanhulu.\n• **Almasi (diamond)** -- Mwadui (Williamson Mine) ni maarufu duniani.\n• **Gesi asilia** -- akiba kubwa zimegunduliwa Lindi, Mtwara, na baharini.",
+  },
+  {
+    keys: ["sayari", "jua", "mwezi", "nyota", "space", "anga", "galaxy"],
+    answer:
+      "🚀 **Mfumo wa Jua:**\n• Sayari 8: Mercury, Venus, Dunia, Mars, Jupiter, Saturn, Uranus, Neptune.\n• Dunia iko umbali wa **km 150 milioni** kutoka Jua.\n• Mwezi unachukua siku **27.3** kuzunguka Dunia.\n• Galaxy yetu inaitwa **Milky Way** -- ina nyota zaidi ya **200 bilioni**!",
+  },
+
+  // ── Lugha / Language ──
+  {
+    keys: ["kiswahili", "lugha", "translate", "tafsiri", "english"],
+    answer:
+      "🗣️ **Maneno Muhimu Kiswahili - Kiingereza:**\nHabari → Hello/How are you\nAsante → Thank you\nTafadhali → Please\nSamahani → Sorry/Excuse me\nNdiyo → Yes | Hapana → No\nKaribu → Welcome\nHesabu → Bill/Calculation\nBiashara → Business\nBidhaa → Product/Item\nMauzo → Sales",
+  },
+
+  // ── Usafiri / Transport ──
+  {
+    keys: [
+      "usafiri",
+      "safari",
+      "basi",
+      "ndege",
+      "gari",
+      "pikipiki",
+      "bodaboda",
+    ],
+    answer:
+      "🚌 **Usafiri Tanzania:**\n• **Basi la UMEME/Rapid Transit (BRT)** -- Dar es Salaam, bei nafuu na haraka.\n• **Ndege za ndani:** Air Tanzania, Precision Air, Coastal Aviation.\n• **Meli:** Dar es Salaam ↔ Zanzibar kwa masaa ~2 (MV Kilimanjaro, n.k.).\n• **Bodaboda/Tuk-tuk:** Weka bei kabla ya kuingia ili kuepuka migogoro.",
+  },
+
+  // ── Chakula / Food ──
+  {
+    keys: [
+      "chakula",
+      "kupika",
+      "ugali",
+      "pilau",
+      "nyama",
+      "samaki",
+      "mbogamboga",
+    ],
+    answer:
+      "🍲 **Chakula Maarufu Tanzania:**\n• **Ugali** -- chakula cha msingi kilichopikwa na unga wa mahindi.\n• **Pilau** -- mchele wa viungo, maarufu Zanzibar na pwani.\n• **Nyama Choma** -- nyama ya ng'ombe/mbuzi iliyochomwa mkaa.\n• **Maharage ya nazi** -- maharagwe kupikwa na maziwa ya nazi.\n• **Zanzibar Pizza** -- ndizi, nyama, mayai, na jibini ndani ya uji uliokangwa.",
+  },
+
+  // ── Michezo / Sports ──
+  {
+    keys: ["michezo", "mpira", "simba", "yanga", "timu", "cricket", "marathon"],
+    answer:
+      "⚽ **Michezo Tanzania:**\n• **Simba SC** na **Young Africans (Yanga)** -- mechi zao ni sherehe kubwa!\n• **Ligi Kuu Tanzania** -- mchezo wa mpira unaopendwa zaidi.\n• **Wanariadha:** Tanzania imewahi kushinda medali za Olympic (marathon).\n• **Cricket, netball, na boxing** pia vinafuatwa.",
+  },
+
+  // ── Msaada wa jumla ──
+  {
+    keys: ["msaada", "help", "nikusaidie", "unaweza", "naweza"],
+    answer:
+      "🤝 **Ninaweza Kukusaidia Na:**\n💳 Malipo & Fedha\n📦 Maagizo & Biashara\n🏪 Kusimamia Duka\n🌾 Kilimo & Mifugo\n🏥 Afya ya Msingi\n💻 Teknolojia & Simu\n🎓 Elimu\n🌍 Jiografia & Sayansi\n🍲 Chakula & Utamaduni\n⚽ Michezo\n🧮 Hesabu (mfano: 250 * 3)\n\nUliza swali lolote!",
+  },
+];
+
 function getBotResponse(input: string): string {
-  const text = input.toLowerCase();
+  const text = input.toLowerCase().trim();
 
-  if (
-    text.includes("malipo") ||
-    text.includes("payment") ||
-    text.includes("kulipa") ||
-    text.includes("lipa")
-  ) {
-    return "Ili kulipa, tazama namba ya malipo ya duka (iko kwenye ukurasa wa duka, kisanduku cha kijani \uD83D\uDCB3). Unaweza kulipa kupitia M-Pesa, Tigo Pesa, Airtel Money au njia yoyote inayokubaliwa na mwenye duka. Baada ya kulipa, mwambie mwenye duka namba ya malipo yako ili athibitishe.";
-  }
-  if (
-    text.includes("agizo") ||
-    text.includes("order") ||
-    text.includes("bidhaa") ||
-    text.includes("nunua")
-  ) {
-    return "Hatua za kuagiza:\n1) Tafuta duka au bidhaa unayoitaka kwenye Soko.\n2) Fungua duka na bonyeza bidhaa.\n3) Bonyeza 'Agiza Sasa'.\n4) Taarifa zako (jina + simu) zitatumwa kwa mwenye duka.\n5) Mwenye duka atakuwasiliana nawe kuthibitisha na kukuambia jinsi ya kulipa.";
-  }
-  if (
-    text.includes("duka") ||
-    text.includes("shop") ||
-    text.includes("biashara") ||
-    text.includes("register")
-  ) {
-    return "Ili kuunda duka:\n1) Nenda 'Ofisi Yangu'.\n2) Bonyeza 'Unda Duka Jipya'.\n3) Chagua kundi la biashara yako (Soko, Chipsi, Welding, n.k.).\n4) Jaza taarifa za duka (jina, maelezo, namba ya malipo).\n5) Bonyeza Hifadhi. Duka lako litaonekana mara moja bila ya malipo yoyote!";
-  }
-  if (text.includes("admin") || text.includes("mamlaka")) {
-    return "Ili kupata haki za admin: Nenda Ofisi Yangu \u2192 \u2699\uFE0F Mipangilio. Utaona chaguo la 'Daka Admin' au 'Futa Admin wa Zamani'. Kama una msimbo wa reset, ingiza: ctm2026. Mtumiaji wa kwanza kujisajili anakuwa Admin moja kwa moja.";
-  }
-  if (
-    text.includes("hitilafu") ||
-    text.includes("error") ||
-    text.includes("shida") ||
-    text.includes("tatizo")
-  ) {
-    return "Kama unakutana na hitilafu:\n1) Jaribu kutoka (Logout) kisha kuingia tena.\n2) Pakua upya ukurasa (Refresh).\n3) Hakikisha umeingiza taarifa zote zinazohitajika.\n4) Kama shida inaendelea, jaribu tena baadaye au wasiliana na msaada.";
-  }
-  if (
-    text.includes("bei") ||
-    text.includes("price") ||
-    text.includes("tzs") ||
-    text.includes("shilingi")
-  ) {
-    return "Bei zote zinaonyeshwa kwa Shilingi za Tanzania (TZS). Bei ya bidhaa inaonekana kwenye kila kadi ya bidhaa. Hakuna ada za ziada au makato ya asilimia kwenye app hii.";
-  }
-  if (
-    text.includes("notification") ||
-    text.includes("arifa") ||
-    text.includes("taarifa")
-  ) {
-    return "Mwenye duka anapokea arifa kila mtu akiagiza bidhaa yake -- pamoja na jina na namba ya simu ya mteja. Unaweza kuchagua sauti ya arifa kwenye \u2699\uFE0F Mipangilio (Beep, Bell, Chime, au Double).";
-  }
-  if (
-    text.includes("kutafuta") ||
-    text.includes("search") ||
-    text.includes("tafuta")
-  ) {
-    return "Ili kutafuta: Bonyeza 'Soko' kwenye menyu ya chini. Chagua kundi la biashara (Soko, Chipsi, Welding, n.k.) kisha tafuta bidhaa au duka ndani ya kundi hilo. Pia unaweza kutumia kisanduku cha kutafuta juu ya ukurasa.";
-  }
-  if (
-    text.includes("profile") ||
-    text.includes("akaunti") ||
-    text.includes("account") ||
-    text.includes("usajili") ||
-    text.includes("sajili")
-  ) {
-    return "Ili kusajili:\n1) Bonyeza Login.\n2) Ingia kwa Internet Identity.\n3) Jaza jina lako, namba ya simu, na email.\n4) Bonyeza Hifadhi. Akaunti yako itaundwa mara moja!";
+  // 1. Try math first
+  const mathResult = tryMath(text);
+  if (mathResult) return mathResult;
+
+  // 2. Score each knowledge entry
+  let bestScore = 0;
+  let bestAnswer = "";
+
+  for (const entry of knowledge) {
+    let score = 0;
+    for (const key of entry.keys) {
+      if (text.includes(key)) {
+        score += key.length; // longer key match = more specific
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestAnswer = entry.answer;
+    }
   }
 
-  return "Samahani, sijaelewa vizuri swali lako. Unaweza kuuliza kuhusu:\n\uD83D\uDCB3 Malipo | \uD83D\uDCE6 Maagizo | \uD83C\uDFEA Duka | \uD83D\uDD11 Admin | \u2753 Msaada\n\nAu andika swali lako kwa undani zaidi.";
+  if (bestScore > 0) return bestAnswer;
+
+  // 3. Fallback: smart general response
+  return (
+    "🤔 Swali lako ni zuri! Sijaweza kupata jibu kamili, lakini naomba uniambie zaidi ili nikusaidie vizuri.\n\n" +
+    "Au unaweza kuuliza kuhusu:\n" +
+    "💳 Malipo | 📦 Maagizo | 🏪 Duka | 🌾 Kilimo | 🏥 Afya | 💻 Teknolojia | 🎓 Elimu | 🌍 Dunia | 🧮 Hesabu"
+  );
 }
 
 const QUICK_REPLIES = [
-  { emoji: "\uD83D\uDCB3", label: "Malipo", query: "malipo" },
-  { emoji: "\uD83D\uDCE6", label: "Maagizo", query: "agizo" },
-  { emoji: "\uD83C\uDFEA", label: "Duka langu", query: "duka" },
-  { emoji: "\uD83D\uDD11", label: "Admin", query: "admin" },
-  { emoji: "\u2753", label: "Msaada", query: "msaada" },
+  { emoji: "💳", label: "Malipo", query: "malipo" },
+  { emoji: "📦", label: "Maagizo", query: "agizo" },
+  { emoji: "🏪", label: "Duka", query: "duka" },
+  { emoji: "🌾", label: "Kilimo", query: "kilimo" },
+  { emoji: "🏥", label: "Afya", query: "afya" },
+  { emoji: "💻", label: "Teknolojia", query: "internet" },
+  { emoji: "🎓", label: "Elimu", query: "elimu" },
+  { emoji: "🧮", label: "Hesabu", query: "25 * 40" },
 ];
 
 export function AiAssistant() {
@@ -103,7 +376,7 @@ export function AiAssistant() {
     {
       id: 0,
       role: "bot",
-      text: "Karibu! Mimi ni Msaidizi wa CTM \uD83E\uDD16. Ninaweza kukusaidia kuhusu malipo, maagizo, duka, na zaidi. Unauliza nini?",
+      text: "Karibu! Mimi ni Msaidizi wa CTM 🤖\n\nNinaweza kukusaidia kuhusu:\n💳 Malipo & Fedha\n📦 Maagizo\n🏪 Biashara\n🌾 Kilimo\n🏥 Afya\n💻 Teknolojia\n🌍 Habari za Dunia\n🧮 Hesabu (mfano: andika '250 * 3')\n\nUnauliza nini leo?",
       time: getTime(),
     },
   ]);
@@ -121,7 +394,6 @@ export function AiAssistant() {
     }
   }, [open]);
 
-  // Scroll to bottom whenever messages change or typing changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   });
@@ -150,7 +422,7 @@ export function AiAssistant() {
       setIsTyping(false);
       setMessages((prev) => [...prev, botMsg]);
       if (!open) setHasUnread(true);
-    }, 800);
+    }, 700);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -170,8 +442,8 @@ export function AiAssistant() {
               transition={{ type: "spring", stiffness: 340, damping: 28 }}
               className="absolute bottom-16 right-0 rounded-2xl shadow-2xl border border-border bg-background flex flex-col overflow-hidden"
               style={{
-                width: "min(320px, calc(100vw - 32px))",
-                height: "460px",
+                width: "min(340px, calc(100vw - 32px))",
+                height: "500px",
               }}
               data-ocid="ai_assistant.panel"
             >
@@ -185,14 +457,14 @@ export function AiAssistant() {
               >
                 <div className="flex items-center gap-2">
                   <span className="text-xl" role="img" aria-label="robot">
-                    \uD83E\uDD16
+                    🤖
                   </span>
                   <div>
                     <p className="font-semibold text-sm leading-tight">
                       Msaidizi wa CTM
                     </p>
                     <p className="text-xs opacity-80">
-                      CTM Assistant \u00B7 Online
+                      CTM Smart Assistant · Online
                     </p>
                   </div>
                 </div>
@@ -203,7 +475,7 @@ export function AiAssistant() {
                   data-ocid="ai_assistant.close_button"
                   aria-label="Funga"
                 >
-                  \u2715
+                  ✕
                 </button>
               </div>
 
@@ -213,7 +485,9 @@ export function AiAssistant() {
                   {messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                      className={`flex ${
+                        msg.role === "user" ? "justify-end" : "justify-start"
+                      }`}
                     >
                       {msg.role === "bot" && (
                         <span
@@ -225,11 +499,11 @@ export function AiAssistant() {
                           role="img"
                           aria-label="bot"
                         >
-                          \uD83E\uDD16
+                          🤖
                         </span>
                       )}
                       <div
-                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm whitespace-pre-line ${
+                        className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm whitespace-pre-line ${
                           msg.role === "user"
                             ? "text-white rounded-br-sm"
                             : "bg-muted text-foreground rounded-bl-sm"
@@ -269,7 +543,7 @@ export function AiAssistant() {
                         role="img"
                         aria-label="bot typing"
                       >
-                        \uD83E\uDD16
+                        🤖
                       </span>
                       <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1 items-center">
                         {[0, 1, 2].map((i) => (
@@ -331,7 +605,7 @@ export function AiAssistant() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Andika swali lako..."
+                  placeholder="Andika swali lolote..."
                   className="flex-1 text-sm bg-muted rounded-full px-4 py-2 outline-none border-none text-foreground placeholder:text-muted-foreground"
                   data-ocid="ai_assistant.input"
                 />
@@ -347,7 +621,7 @@ export function AiAssistant() {
                   data-ocid="ai_assistant.submit_button"
                   aria-label="Tuma"
                 >
-                  \u27A4
+                  ➤
                 </button>
               </div>
             </motion.div>
@@ -370,7 +644,7 @@ export function AiAssistant() {
           aria-label="Msaidizi wa CTM"
         >
           <span role="img" aria-label={open ? "close" : "assistant"}>
-            {open ? "\u2715" : "\uD83E\uDD16"}
+            {open ? "✕" : "🤖"}
           </span>
           {!open && hasUnread && (
             <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white" />
