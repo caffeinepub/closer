@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { AiAssistant } from "./components/AiAssistant";
 import { BottomNav, type Page } from "./components/BottomNav";
 import { ThemeProvider } from "./context/ThemeContext";
 import { useActor } from "./hooks/useActor";
@@ -179,6 +180,7 @@ function AppInner() {
         </Suspense>
       </main>
       <BottomNav current={page} onChange={setPage} isAdmin={!!isAdmin} />
+      <AiAssistant />
     </div>
   );
 }
