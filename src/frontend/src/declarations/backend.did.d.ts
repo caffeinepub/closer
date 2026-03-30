@@ -11,6 +11,14 @@ import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
 export interface AppSettings { 'platformPaymentNumber' : string }
+export interface AppFeedback {
+  'id' : bigint,
+  'userId' : Principal,
+  'userName' : string,
+  'rating' : bigint,
+  'comment' : string,
+  'timestamp' : bigint,
+}
 export type ExternalBlob = Uint8Array;
 export interface Notification {
   'id' : bigint,
@@ -35,16 +43,6 @@ export interface Order {
   'customerId' : Principal,
   'totalPrice' : bigint,
 }
-export interface PaymentReference {
-  'id' : bigint,
-  'status' : string,
-  'referenceNumber' : string,
-  'ownerName' : string,
-  'shopId' : bigint,
-  'ownerId' : Principal,
-  'submittedAt' : bigint,
-  'shopName' : string,
-}
 export interface Product {
   'id' : bigint,
   'shopId' : bigint,
@@ -67,11 +65,12 @@ export interface Shop {
   'whatsapp' : string,
   'description' : string,
   'isActive' : boolean,
+  'isAvailable' : boolean,
+  'category' : string,
   'paymentNumbers' : string,
   'facebook' : string,
   'longitude' : number,
   'address' : string,
-  'category' : string,
 }
 export interface UserProfile {
   'name' : string,
@@ -111,8 +110,7 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'approveSubscriptionReference' : ActorMethod<[bigint], undefined>,
-  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'claimAdminIfNoneYet' : ActorMethod<[], boolean>,
   'createProduct' : ActorMethod<
     [string, string, bigint, string, ExternalBlob, bigint, bigint],
     bigint
@@ -123,35 +121,35 @@ export interface _SERVICE {
   >,
   'deleteProduct' : ActorMethod<[bigint], undefined>,
   'deleteShop' : ActorMethod<[bigint], undefined>,
+  'forceResetAndClaimAdmin' : ActorMethod<[string], boolean>,
   'getActiveShops' : ActorMethod<[], Array<Shop>>,
-  'getAllProducts' : ActorMethod<[], Array<Product>>,
-  'getAllReferences' : ActorMethod<[], Array<PaymentReference>>,
-  'getAllOrdersAdmin' : ActorMethod<[], Array<Order>>,
-  'getAllShops' : ActorMethod<[], Array<Shop>>,
-  'getShopsByCategory' : ActorMethod<[string], Array<Shop>>,
   'getActiveShopsByCategory' : ActorMethod<[string], Array<Shop>>,
+  'getAllOrdersAdmin' : ActorMethod<[], Array<Order>>,
+  'getAllProducts' : ActorMethod<[], Array<Product>>,
+  'getAllShops' : ActorMethod<[], Array<Shop>>,
   'getAllUserProfiles' : ActorMethod<[], Array<[Principal, UserProfile]>>,
+  'getAppFeedbacks' : ActorMethod<[], Array<AppFeedback>>,
   'getAppSettings' : ActorMethod<[], AppSettings>,
+  'getAverageRating' : ActorMethod<[], [bigint, bigint]>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
-  'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getMyNotifications' : ActorMethod<[], Array<Notification>>,
   'getMyOrders' : ActorMethod<[], Array<Order>>,
   'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
-  'getMyReferences' : ActorMethod<[bigint], Array<PaymentReference>>,
   'getOrder' : ActorMethod<[bigint], [] | [Order]>,
-  'getPendingReferences' : ActorMethod<[], Array<PaymentReference>>,
   'getProduct' : ActorMethod<[bigint], [] | [Product]>,
   'getShop' : ActorMethod<[bigint], [] | [Shop]>,
   'getShopOrders' : ActorMethod<[bigint], Array<Order>>,
   'getShopProducts' : ActorMethod<[bigint], Array<Product>>,
+  'getShopsByCategory' : ActorMethod<[string], Array<Shop>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'markNotificationAsRead' : ActorMethod<[bigint], undefined>,
   'placeOrder' : ActorMethod<[bigint, bigint], bigint>,
+  'promoteUserToAdmin' : ActorMethod<[Principal], undefined>,
   'registerProfile' : ActorMethod<[string, string, string, string], undefined>,
-  'rejectSubscriptionReference' : ActorMethod<[bigint], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
-  'submitSubscriptionReference' : ActorMethod<[bigint, string], bigint>,
+  'submitAppFeedback' : ActorMethod<[bigint, string], bigint>,
+  'toggleShopAvailability' : ActorMethod<[bigint], boolean>,
   'updateAppSettings' : ActorMethod<[string], undefined>,
   'updateOrderStatus' : ActorMethod<[bigint, string], undefined>,
   'updatePaymentNote' : ActorMethod<[bigint, string], undefined>,

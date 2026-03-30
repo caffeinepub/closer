@@ -37,6 +37,8 @@ export const Shop = IDL.Record({
   'whatsapp' : IDL.Text,
   'description' : IDL.Text,
   'isActive' : IDL.Bool,
+  'isAvailable' : IDL.Bool,
+  'category' : IDL.Text,
   'paymentNumbers' : IDL.Text,
   'facebook' : IDL.Text,
   'longitude' : IDL.Float64,
@@ -51,16 +53,6 @@ export const Product = IDL.Record({
   'category' : IDL.Text,
   'image' : ExternalBlob,
   'price' : IDL.Nat,
-});
-export const PaymentReference = IDL.Record({
-  'id' : IDL.Nat,
-  'status' : IDL.Text,
-  'referenceNumber' : IDL.Text,
-  'ownerName' : IDL.Text,
-  'shopId' : IDL.Nat,
-  'ownerId' : IDL.Principal,
-  'submittedAt' : IDL.Int,
-  'shopName' : IDL.Text,
 });
 export const UserProfile = IDL.Record({
   'name' : IDL.Text,
@@ -93,6 +85,14 @@ export const Order = IDL.Record({
   'customerId' : IDL.Principal,
   'totalPrice' : IDL.Nat,
 });
+export const AppFeedback = IDL.Record({
+  'id' : IDL.Nat,
+  'userId' : IDL.Principal,
+  'userName' : IDL.Text,
+  'rating' : IDL.Nat,
+  'comment' : IDL.Text,
+  'timestamp' : IDL.Int,
+});
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -122,8 +122,7 @@ export const idlService = IDL.Service({
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-  'approveSubscriptionReference' : IDL.Func([IDL.Nat], [], []),
-  'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'claimAdminIfNoneYet' : IDL.Func([], [IDL.Bool], []),
   'createProduct' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Nat, IDL.Text, ExternalBlob, IDL.Nat, IDL.Nat],
       [IDL.Nat],
@@ -140,38 +139,37 @@ export const idlService = IDL.Service({
         IDL.Text,
         IDL.Text,
         IDL.Text,
+        IDL.Text,
       ],
       [IDL.Nat],
       [],
     ),
   'deleteProduct' : IDL.Func([IDL.Nat], [], []),
   'deleteShop' : IDL.Func([IDL.Nat], [], []),
+  'forceResetAndClaimAdmin' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'getActiveShops' : IDL.Func([], [IDL.Vec(Shop)], ['query']),
+  'getActiveShopsByCategory' : IDL.Func([IDL.Text], [IDL.Vec(Shop)], ['query']),
+  'getAllOrdersAdmin' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getAllProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
-  'getAllReferences' : IDL.Func([], [IDL.Vec(PaymentReference)], ['query']),
   'getAllShops' : IDL.Func([], [IDL.Vec(Shop)], ['query']),
   'getAllUserProfiles' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Principal, UserProfile))],
       ['query'],
     ),
+  'getAppFeedbacks' : IDL.Func([], [IDL.Vec(AppFeedback)], ['query']),
   'getAppSettings' : IDL.Func([], [AppSettings], ['query']),
+  'getAverageRating' : IDL.Func([], [IDL.Tuple(IDL.Nat, IDL.Nat)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-  'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
   'getMyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-  'getMyReferences' : IDL.Func(
-      [IDL.Nat],
-      [IDL.Vec(PaymentReference)],
-      ['query'],
-    ),
   'getOrder' : IDL.Func([IDL.Nat], [IDL.Opt(Order)], ['query']),
-  'getPendingReferences' : IDL.Func([], [IDL.Vec(PaymentReference)], ['query']),
   'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
   'getShop' : IDL.Func([IDL.Nat], [IDL.Opt(Shop)], ['query']),
   'getShopOrders' : IDL.Func([IDL.Nat], [IDL.Vec(Order)], ['query']),
   'getShopProducts' : IDL.Func([IDL.Nat], [IDL.Vec(Product)], ['query']),
+  'getShopsByCategory' : IDL.Func([IDL.Text], [IDL.Vec(Shop)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -180,14 +178,15 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'markNotificationAsRead' : IDL.Func([IDL.Nat], [], []),
   'placeOrder' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Nat], []),
+  'promoteUserToAdmin' : IDL.Func([IDL.Principal], [], []),
   'registerProfile' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
       [],
       [],
     ),
-  'rejectSubscriptionReference' : IDL.Func([IDL.Nat], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'submitSubscriptionReference' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
+  'submitAppFeedback' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
+  'toggleShopAvailability' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'updateAppSettings' : IDL.Func([IDL.Text], [], []),
   'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'updatePaymentNote' : IDL.Func([IDL.Nat, IDL.Text], [], []),
@@ -205,6 +204,7 @@ export const idlService = IDL.Service({
         IDL.Text,
         IDL.Float64,
         IDL.Float64,
+        IDL.Text,
         IDL.Text,
         IDL.Text,
         IDL.Text,
@@ -232,11 +232,6 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Opt(IDL.Bool),
     'topped_up_amount' : IDL.Opt(IDL.Nat),
   });
-  const UserRole = IDL.Variant({
-    'admin' : IDL.Null,
-    'user' : IDL.Null,
-    'guest' : IDL.Null,
-  });
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const Shop = IDL.Record({
     'id' : IDL.Nat,
@@ -250,6 +245,8 @@ export const idlFactory = ({ IDL }) => {
     'whatsapp' : IDL.Text,
     'description' : IDL.Text,
     'isActive' : IDL.Bool,
+    'isAvailable' : IDL.Bool,
+    'category' : IDL.Text,
     'paymentNumbers' : IDL.Text,
     'facebook' : IDL.Text,
     'longitude' : IDL.Float64,
@@ -264,16 +261,6 @@ export const idlFactory = ({ IDL }) => {
     'category' : IDL.Text,
     'image' : ExternalBlob,
     'price' : IDL.Nat,
-  });
-  const PaymentReference = IDL.Record({
-    'id' : IDL.Nat,
-    'status' : IDL.Text,
-    'referenceNumber' : IDL.Text,
-    'ownerName' : IDL.Text,
-    'shopId' : IDL.Nat,
-    'ownerId' : IDL.Principal,
-    'submittedAt' : IDL.Int,
-    'shopName' : IDL.Text,
   });
   const UserProfile = IDL.Record({
     'name' : IDL.Text,
@@ -306,7 +293,15 @@ export const idlFactory = ({ IDL }) => {
     'customerId' : IDL.Principal,
     'totalPrice' : IDL.Nat,
   });
-  
+  const AppFeedback = IDL.Record({
+    'id' : IDL.Nat,
+    'userId' : IDL.Principal,
+    'userName' : IDL.Text,
+    'rating' : IDL.Nat,
+    'comment' : IDL.Text,
+    'timestamp' : IDL.Int,
+  });
+
   return IDL.Service({
     '_caffeineStorageBlobIsLive' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
@@ -335,8 +330,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-    'approveSubscriptionReference' : IDL.Func([IDL.Nat], [], []),
-    'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'claimAdminIfNoneYet' : IDL.Func([], [IDL.Bool], []),
     'createProduct' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Text, ExternalBlob, IDL.Nat, IDL.Nat],
         [IDL.Nat],
@@ -353,42 +347,37 @@ export const idlFactory = ({ IDL }) => {
           IDL.Text,
           IDL.Text,
           IDL.Text,
+          IDL.Text,
         ],
         [IDL.Nat],
         [],
       ),
     'deleteProduct' : IDL.Func([IDL.Nat], [], []),
     'deleteShop' : IDL.Func([IDL.Nat], [], []),
+    'forceResetAndClaimAdmin' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'getActiveShops' : IDL.Func([], [IDL.Vec(Shop)], ['query']),
+    'getActiveShopsByCategory' : IDL.Func([IDL.Text], [IDL.Vec(Shop)], ['query']),
+    'getAllOrdersAdmin' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getAllProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
-    'getAllReferences' : IDL.Func([], [IDL.Vec(PaymentReference)], ['query']),
     'getAllShops' : IDL.Func([], [IDL.Vec(Shop)], ['query']),
     'getAllUserProfiles' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, UserProfile))],
         ['query'],
       ),
+    'getAppFeedbacks' : IDL.Func([], [IDL.Vec(AppFeedback)], ['query']),
     'getAppSettings' : IDL.Func([], [AppSettings], ['query']),
+    'getAverageRating' : IDL.Func([], [IDL.Tuple(IDL.Nat, IDL.Nat)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-    'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
     'getMyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-    'getMyReferences' : IDL.Func(
-        [IDL.Nat],
-        [IDL.Vec(PaymentReference)],
-        ['query'],
-      ),
     'getOrder' : IDL.Func([IDL.Nat], [IDL.Opt(Order)], ['query']),
-    'getPendingReferences' : IDL.Func(
-        [],
-        [IDL.Vec(PaymentReference)],
-        ['query'],
-      ),
     'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
     'getShop' : IDL.Func([IDL.Nat], [IDL.Opt(Shop)], ['query']),
     'getShopOrders' : IDL.Func([IDL.Nat], [IDL.Vec(Order)], ['query']),
     'getShopProducts' : IDL.Func([IDL.Nat], [IDL.Vec(Product)], ['query']),
+    'getShopsByCategory' : IDL.Func([IDL.Text], [IDL.Vec(Shop)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
@@ -397,18 +386,15 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'markNotificationAsRead' : IDL.Func([IDL.Nat], [], []),
     'placeOrder' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Nat], []),
+    'promoteUserToAdmin' : IDL.Func([IDL.Principal], [], []),
     'registerProfile' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
         [],
         [],
       ),
-    'rejectSubscriptionReference' : IDL.Func([IDL.Nat], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'submitSubscriptionReference' : IDL.Func(
-        [IDL.Nat, IDL.Text],
-        [IDL.Nat],
-        [],
-      ),
+    'submitAppFeedback' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
+    'toggleShopAvailability' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'updateAppSettings' : IDL.Func([IDL.Text], [], []),
     'updateOrderStatus' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'updatePaymentNote' : IDL.Func([IDL.Nat, IDL.Text], [], []),
@@ -426,6 +412,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Text,
           IDL.Float64,
           IDL.Float64,
+          IDL.Text,
           IDL.Text,
           IDL.Text,
           IDL.Text,

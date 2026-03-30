@@ -834,6 +834,7 @@ actor {
     (total * 10 / count, count)
   };
 
+
   // Allows anyone to claim admin if no admin has been assigned yet.
   public shared ({ caller }) func claimAdminIfNoneYet() : async Bool {
     if (caller.isAnonymous()) { return false };

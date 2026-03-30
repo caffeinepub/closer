@@ -186,7 +186,7 @@ export interface backendInterface {
     approveSubscriptionReference(referenceId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createProduct(name: string, description: string, price: bigint, category: string, image: ExternalBlob, stock: bigint, shopId: bigint): Promise<bigint>;
-    createShop(name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string): Promise<bigint>;
+    createShop(name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string, category: string): Promise<bigint>;
     deleteProduct(productId: bigint): Promise<void>;
     deleteShop(shopId: bigint): Promise<void>;
     getActiveShops(): Promise<Array<Shop>>;
@@ -220,7 +220,7 @@ export interface backendInterface {
     updatePaymentNote(orderId: bigint, paymentNote: string): Promise<void>;
     updateProduct(productId: bigint, name: string, description: string, price: bigint, category: string, image: ExternalBlob, stock: bigint): Promise<void>;
     updateProfilePicture(callerProfilePicture: ExternalBlob): Promise<void>;
-    updateShop(shopId: bigint, name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string): Promise<void>;
+    updateShop(shopId: bigint, name: string, description: string, address: string, latitude: number, longitude: number, tiktok: string, whatsapp: string, instagram: string, facebook: string, category: string): Promise<void>;
     updateShopLogo(shopId: bigint, shopLogo: ExternalBlob): Promise<void>;
     updateShopPaymentNumbers(shopId: bigint, paymentNumbers: string): Promise<void>;
     uploadPaymentProof(orderId: bigint, paymentProof: ExternalBlob, paymentNote: string): Promise<void>;
@@ -368,17 +368,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createShop(arg0: string, arg1: string, arg2: string, arg3: number, arg4: number, arg5: string, arg6: string, arg7: string, arg8: string): Promise<bigint> {
+    async createShop(arg0: string, arg1: string, arg2: string, arg3: number, arg4: number, arg5: string, arg6: string, arg7: string, arg8: string, arg9: string): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.createShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                const result = await this.actor.createShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            const result = await this.actor.createShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
             return result;
         }
     }
@@ -844,17 +844,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async updateShop(arg0: bigint, arg1: string, arg2: string, arg3: string, arg4: number, arg5: number, arg6: string, arg7: string, arg8: string, arg9: string): Promise<void> {
+    async updateShop(arg0: bigint, arg1: string, arg2: string, arg3: string, arg4: number, arg5: number, arg6: string, arg7: string, arg8: string, arg9: string, arg10: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+                const result = await this.actor.updateShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+            const result = await this.actor.updateShop(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
             return result;
         }
     }
