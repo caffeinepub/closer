@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Principal } from "@icp-sdk/core/principal";
 import {
+  CheckCircle,
   Loader2,
   Package,
   RefreshCw,
@@ -13,6 +14,7 @@ import {
   ShoppingBag,
   Store,
   Users,
+  XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +25,8 @@ import {
   useAllShops,
   useAllUserProfiles,
   useAppSettings,
+  useConfirmPayment,
+  useRejectPayment,
   useUpdateAppSettings,
 } from "../hooks/useQueries";
 
@@ -278,7 +282,83 @@ function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
-function OrderCard({ order, idx }: { order: Order; idx: number }) {
+function PaymentStatusBadge({ paymentStatus }: { paymentStatus: string }) {
+  const s = (paymentStatus || "").toLowerCase();
+
+  if (s === "confirmed") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium"
+        style={{ background: "hsl(142,60%,94%)", color: "hsl(142,60%,28%)" }}
+        data-ocid="admin.payment.success_state"
+      >
+        <CheckCircle size={11} /> Malipo yamethibitishwa
+      </span>
+    );
+  }
+  if (s === "rejected") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium"
+        style={{ background: "hsl(0,90%,95%)", color: "hsl(0,70%,38%)" }}
+        data-ocid="admin.payment.error_state"
+      >
+        <XCircle size={11} /> Yamekataliwa
+      </span>
+    );
+  }
+  if (s === "pending") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium"
+        style={{ background: "hsl(45,90%,92%)", color: "hsl(35,80%,30%)" }}
+        data-ocid="admin.payment.loading_state"
+      >
+        ⏳ Inangoja ukaguzi
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5"
+      style={{
+        background: "hsl(var(--muted))",
+        color: "hsl(var(--muted-foreground))",
+      }}
+    >
+      💸 Hajalipwa
+    </span>
+  );
+}
+
+function AdminOrderCard({
+  order,
+  idx,
+  onConfirmPayment,
+  onRejectPayment,
+  isConfirming,
+}: {
+  order: Order;
+  idx: number;
+  onConfirmPayment: (orderId: bigint) => void;
+  onRejectPayment: (orderId: bigint) => void;
+  isConfirming?: boolean;
+}) {
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
+
+  // Resolve proof image URL from ExternalBlob
+  const proofBlob = order.paymentProof;
+  if (proofBlob && !proofUrl) {
+    try {
+      const url = proofBlob.getDirectURL();
+      if (url) setProofUrl(url);
+    } catch {
+      // ignore
+    }
+  }
+
+  const isPending = (order.paymentStatus || "").toLowerCase() === "pending";
+
   return (
     <div
       className="rounded-xl border p-3 space-y-2"
@@ -288,6 +368,7 @@ function OrderCard({ order, idx }: { order: Order; idx: number }) {
       }}
       data-ocid={`admin.orders.item.${idx + 1}`}
     >
+      {/* Customer info */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p
@@ -307,6 +388,8 @@ function OrderCard({ order, idx }: { order: Order; idx: number }) {
         </div>
         <OrderStatusBadge status={order.status} />
       </div>
+
+      {/* Order details */}
       <div className="flex items-center justify-between">
         <div className="text-xs space-y-0.5">
           <InfoRow label="Agizo #" value={order.id.toString()} />
@@ -320,6 +403,88 @@ function OrderCard({ order, idx }: { order: Order; idx: number }) {
           {formatTZS(order.totalPrice)}
         </span>
       </div>
+
+      {/* Payment status badge */}
+      <div className="flex flex-wrap items-center gap-2">
+        <PaymentStatusBadge paymentStatus={order.paymentStatus} />
+      </div>
+
+      {/* Payment note */}
+      {order.paymentNote && (
+        <p
+          className="text-xs rounded-lg px-2 py-1"
+          style={{
+            background: "hsl(var(--muted))",
+            color: "hsl(var(--muted-foreground))",
+          }}
+        >
+          📝 {order.paymentNote}
+        </p>
+      )}
+
+      {/* Payment proof thumbnail */}
+      {proofUrl && (
+        <div className="flex items-center gap-2">
+          <a
+            href={proofUrl}
+            target="_blank"
+            rel="noreferrer"
+            title="Angalia picha kamili"
+          >
+            <img
+              src={proofUrl}
+              alt="Uthibitisho wa malipo"
+              className="w-16 h-16 rounded-lg object-cover border"
+              style={{ borderColor: "hsl(var(--border))" }}
+            />
+          </a>
+          <a
+            href={proofUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs underline"
+            style={{ color: "hsl(var(--primary))" }}
+          >
+            Angalia ukubwa kamili
+          </a>
+        </div>
+      )}
+
+      {/* Confirm / Reject buttons — only when proof is pending */}
+      {isPending && proofBlob && (
+        <div className="flex gap-2 pt-1">
+          <Button
+            size="sm"
+            className="flex-1 text-xs h-8 gap-1"
+            onClick={() => onConfirmPayment(order.id)}
+            disabled={isConfirming}
+            style={{ background: "hsl(142,60%,40%)", color: "#fff" }}
+            data-ocid={`admin.orders.confirm_button.${idx + 1}`}
+          >
+            {isConfirming ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <CheckCircle size={12} />
+            )}
+            Thibitisha
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 text-xs h-8 gap-1"
+            onClick={() => onRejectPayment(order.id)}
+            disabled={isConfirming}
+            style={{ background: "hsl(0,70%,50%)", color: "#fff" }}
+            data-ocid={`admin.orders.delete_button.${idx + 1}`}
+          >
+            {isConfirming ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <XCircle size={12} />
+            )}
+            Kataa
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -358,6 +523,8 @@ export function AdminPanel() {
   } = useAppSettings();
 
   const updateSettings = useUpdateAppSettings();
+  const confirmPayment = useConfirmPayment();
+  const rejectPayment = useRejectPayment();
   const [paymentNumber, setPaymentNumber] = useState("");
   const [editingPayment, setEditingPayment] = useState(false);
 
@@ -371,6 +538,26 @@ export function AdminPanel() {
         toast.success("Mipangilio imehifadhiwa!");
         setEditingPayment(false);
         refetchSettings();
+      },
+      onError: () => toast.error("Hitilafu — jaribu tena"),
+    });
+  };
+
+  const handleConfirmPayment = (orderId: bigint) => {
+    confirmPayment.mutate(orderId, {
+      onSuccess: () => {
+        toast.success("Malipo yamethibitishwa!");
+        refetchOrders();
+      },
+      onError: () => toast.error("Hitilafu — jaribu tena"),
+    });
+  };
+
+  const handleRejectPayment = (orderId: bigint) => {
+    rejectPayment.mutate(orderId, {
+      onSuccess: () => {
+        toast.success("Malipo yamekataliwa.");
+        refetchOrders();
       },
       onError: () => toast.error("Hitilafu — jaribu tena"),
     });
@@ -564,7 +751,16 @@ export function AdminPanel() {
             ) : (
               <div className="space-y-3">
                 {allOrders.map((order, i) => (
-                  <OrderCard key={order.id.toString()} order={order} idx={i} />
+                  <AdminOrderCard
+                    key={order.id.toString()}
+                    order={order}
+                    idx={i}
+                    onConfirmPayment={handleConfirmPayment}
+                    onRejectPayment={handleRejectPayment}
+                    isConfirming={
+                      confirmPayment.isPending || rejectPayment.isPending
+                    }
+                  />
                 ))}
               </div>
             )}

@@ -191,6 +191,7 @@ export function useActiveShopsByCategory(category: string | null) {
       return (actor as any).getActiveShopsByCategory(category);
     },
     enabled: !!actor && !isFetching && !!category,
+    refetchInterval: 20000, // re-fetch every 20s so shop visibility updates propagate
   });
 }
 
@@ -535,12 +536,67 @@ export function useToggleShopAvailability() {
   return useMutation({
     mutationFn: async (shopId: bigint) => {
       if (!actor) throw new Error("Not connected");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (actor as any).toggleShopAvailability(shopId) as Promise<boolean>;
     },
-    onSuccess: () => {
+    onMutate: async (shopId: bigint) => {
+      // Optimistic update: flip isAvailable/isActive immediately in ["shops"] cache
+      await qc.cancelQueries({ queryKey: ["shops"] });
+      const prev = qc.getQueryData<Shop[]>(["shops"]);
+      if (prev) {
+        qc.setQueryData<Shop[]>(["shops"], (old) =>
+          (old || []).map((s) =>
+            s.id === shopId
+              ? {
+                  ...s,
+                  isAvailable: !(s as Shop & { isAvailable: boolean })
+                    .isAvailable,
+                  isActive: !(s as Shop & { isAvailable: boolean }).isAvailable,
+                }
+              : s,
+          ),
+        );
+      }
+      return { prev };
+    },
+    onError: (_err, _shopId, context) => {
+      // Revert on error
+      if (context?.prev) qc.setQueryData<Shop[]>(["shops"], context.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["shops"] });
       qc.invalidateQueries({ queryKey: ["activeShops"] });
+      qc.invalidateQueries({ queryKey: ["shopsByCategory"] });
+      qc.invalidateQueries({ queryKey: ["activeShopsByCategory"] });
+    },
+  });
+}
+
+export function useConfirmPayment() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).confirmPayment(orderId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allOrdersAdmin"] });
+      qc.invalidateQueries({ queryKey: ["myOrders"] });
+    },
+  });
+}
+
+export function useRejectPayment() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).rejectPayment(orderId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allOrdersAdmin"] });
+      qc.invalidateQueries({ queryKey: ["myOrders"] });
     },
   });
 }

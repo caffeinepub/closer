@@ -1,8 +1,22 @@
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, ClipboardList, Clock, XCircle } from "lucide-react";
+import {
+  CheckCircle,
+  ClipboardList,
+  Clock,
+  Loader2,
+  XCircle,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import type { Order } from "../backend";
-import { useAllProducts, useAllShops, useMyOrders } from "../hooks/useQueries";
+import {
+  useAllProducts,
+  useAllShops,
+  useMyOrders,
+  useUpdatePaymentProof,
+} from "../hooks/useQueries";
 
 const STATUS_CONFIG: Record<
   string,
@@ -22,14 +36,84 @@ const STATUS_CONFIG: Record<
   cancelled: { label: "Imeghairiwa", icon: XCircle, color: "hsl(0,70%,50%)" },
 };
 
+function PaymentStatusBadge({ paymentStatus }: { paymentStatus: string }) {
+  if (paymentStatus === "confirmed") {
+    return (
+      <div
+        className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 font-medium"
+        style={{ background: "hsl(142,60%,94%)", color: "hsl(142,60%,30%)" }}
+        data-ocid="orders.payment.success_state"
+      >
+        <CheckCircle size={13} />
+        <span>Malipo yamethibitishwa</span>
+      </div>
+    );
+  }
+  if (paymentStatus === "rejected") {
+    return (
+      <div
+        className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 font-medium"
+        style={{ background: "hsl(0,90%,95%)", color: "hsl(0,70%,40%)" }}
+        data-ocid="orders.payment.error_state"
+      >
+        <XCircle size={13} />
+        <span>Malipo yamekataliwa — lipa tena</span>
+      </div>
+    );
+  }
+  if (paymentStatus === "pending") {
+    return (
+      <div
+        className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 font-medium"
+        style={{ background: "hsl(45,90%,95%)", color: "hsl(35,80%,35%)" }}
+        data-ocid="orders.payment.loading_state"
+      >
+        <Clock size={13} />
+        <span>Uthibitisho unakaguliwa...</span>
+      </div>
+    );
+  }
+  return null;
+}
+
 function OrderCard({
   order,
   shopName,
   productName,
-}: { order: Order; shopName: string; productName: string }) {
+  shopPaymentNumbers,
+  uploadProof,
+  isUploading,
+}: {
+  order: Order;
+  shopName: string;
+  productName: string;
+  shopPaymentNumbers: string;
+  uploadProof: (orderId: bigint, file: File, note: string) => void;
+  isUploading: boolean;
+}) {
   const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const Icon = cfg.icon;
   const total = Number(order.totalPrice);
+  const [showUpload, setShowUpload] = useState(false);
+  const [proofNote, setProofNote] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const canUpload =
+    order.paymentStatus !== "confirmed" && order.paymentStatus !== "rejected";
+  const hasProofPending =
+    order.paymentStatus === "pending" && order.paymentProof;
+
+  const handleSubmitProof = () => {
+    if (!selectedFile) {
+      toast.error("Chagua picha ya uthibitisho wa malipo");
+      return;
+    }
+    uploadProof(order.id, selectedFile, proofNote);
+    setShowUpload(false);
+    setSelectedFile(null);
+    setProofNote("");
+  };
 
   return (
     <div
@@ -39,6 +123,7 @@ function OrderCard({
         borderColor: "hsl(var(--border))",
       }}
     >
+      {/* Order header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p
@@ -60,6 +145,7 @@ function OrderCard({
         </div>
       </div>
 
+      {/* Quantity & Total */}
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div
           className="rounded-lg p-2 text-center"
@@ -87,17 +173,120 @@ function OrderCard({
         </div>
       </div>
 
-      {/* Payment confirmed badge */}
-      {order.paymentStatus === "confirmed" && (
+      {/* Shop payment number */}
+      {shopPaymentNumbers && (
         <div
-          className="flex items-center gap-1 text-xs rounded-lg px-2 py-1"
-          style={{
-            background: "hsl(120,50%,45% / 0.12)",
-            color: "hsl(120,50%,35%)",
-          }}
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
+          style={{ background: "hsl(142,60%,94%)", color: "hsl(142,50%,28%)" }}
+          data-ocid="orders.payment.card"
         >
-          <CheckCircle size={12} />
-          <span>Malipo yamethibitishwa</span>
+          <span className="text-sm">💳</span>
+          <span>Lipa kwa: {shopPaymentNumbers}</span>
+        </div>
+      )}
+
+      {/* Payment status */}
+      <PaymentStatusBadge paymentStatus={order.paymentStatus} />
+
+      {/* Upload proof section */}
+      {canUpload && !hasProofPending && (
+        <div>
+          {showUpload ? (
+            <div
+              className="space-y-2 rounded-xl p-3 border"
+              style={{
+                background: "hsl(var(--muted))",
+                borderColor: "hsl(var(--border))",
+              }}
+              data-ocid="orders.proof.panel"
+            >
+              <p
+                className="text-xs font-semibold"
+                style={{ color: "hsl(var(--foreground))" }}
+              >
+                📎 Pakia Uthibitisho wa Malipo
+              </p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                data-ocid="orders.proof.upload_button"
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full rounded-lg border-2 border-dashed py-2 text-xs"
+                style={{
+                  borderColor: selectedFile
+                    ? "hsl(142,60%,45%)"
+                    : "hsl(var(--border))",
+                  color: selectedFile
+                    ? "hsl(142,60%,35%)"
+                    : "hsl(var(--muted-foreground))",
+                  background: "hsl(var(--background))",
+                }}
+                data-ocid="orders.proof.dropzone"
+              >
+                {selectedFile
+                  ? `✅ ${selectedFile.name}`
+                  : "Gusa kuchagua picha"}
+              </button>
+              <Input
+                value={proofNote}
+                onChange={(e) => setProofNote(e.target.value)}
+                placeholder="Nambari ya muamala, maelezo..."
+                className="text-xs h-8"
+                data-ocid="orders.proof.input"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 text-xs h-8"
+                  onClick={handleSubmitProof}
+                  disabled={isUploading || !selectedFile}
+                  style={{
+                    background: "linear-gradient(135deg, #1565C0, #6A1B9A)",
+                    color: "#fff",
+                  }}
+                  data-ocid="orders.proof.submit_button"
+                >
+                  {isUploading ? (
+                    <Loader2 size={12} className="animate-spin mr-1" />
+                  ) : null}
+                  Tuma
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-8"
+                  onClick={() => {
+                    setShowUpload(false);
+                    setSelectedFile(null);
+                    setProofNote("");
+                  }}
+                  data-ocid="orders.proof.cancel_button"
+                >
+                  Ghairi
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full text-xs h-8 gap-1.5"
+              onClick={() => setShowUpload(true)}
+              style={{
+                borderColor: "hsl(var(--border))",
+                color: "hsl(var(--foreground))",
+              }}
+              data-ocid="orders.proof.open_modal_button"
+            >
+              📎 Pakia Uthibitisho wa Malipo
+            </Button>
+          )}
         </div>
       )}
     </div>
@@ -108,11 +297,24 @@ export function CustomerDashboard() {
   const { data: orders, isLoading } = useMyOrders();
   const { data: shops } = useAllShops();
   const { data: products } = useAllProducts();
+  const uploadProofMutation = useUpdatePaymentProof();
 
   const getShopName = (shopId: bigint) =>
     shops?.find((s) => s.id === shopId)?.name || `Duka #${shopId}`;
   const getProductName = (productId: bigint) =>
     products?.find((p) => p.id === productId)?.name || `Bidhaa #${productId}`;
+  const getShopPaymentNumbers = (shopId: bigint) =>
+    shops?.find((s) => s.id === shopId)?.paymentNumbers || "";
+
+  const handleUploadProof = (orderId: bigint, file: File, note: string) => {
+    uploadProofMutation.mutate(
+      { orderId, file, paymentNote: note },
+      {
+        onSuccess: () => toast.success("Uthibitisho umetumwa kwa mafanikio!"),
+        onError: () => toast.error("Hitilafu — jaribu tena"),
+      },
+    );
+  };
 
   const grouped = {
     active: (orders || []).filter((o) =>
@@ -184,12 +386,16 @@ export function CustomerDashboard() {
                   Yanayoendelea ({grouped.active.length})
                 </p>
                 <div className="space-y-3">
-                  {grouped.active.map((o) => (
+                  {grouped.active.map((o, i) => (
                     <OrderCard
                       key={o.id.toString()}
                       order={o}
                       shopName={getShopName(o.shopId)}
                       productName={getProductName(o.productId)}
+                      shopPaymentNumbers={getShopPaymentNumbers(o.shopId)}
+                      uploadProof={handleUploadProof}
+                      isUploading={uploadProofMutation.isPending}
+                      data-ocid={`orders.item.${i + 1}`}
                     />
                   ))}
                 </div>
@@ -204,12 +410,16 @@ export function CustomerDashboard() {
                   Zilizotolewa ({grouped.delivered.length})
                 </p>
                 <div className="space-y-3">
-                  {grouped.delivered.map((o) => (
+                  {grouped.delivered.map((o, i) => (
                     <OrderCard
                       key={o.id.toString()}
                       order={o}
                       shopName={getShopName(o.shopId)}
                       productName={getProductName(o.productId)}
+                      shopPaymentNumbers={getShopPaymentNumbers(o.shopId)}
+                      uploadProof={handleUploadProof}
+                      isUploading={uploadProofMutation.isPending}
+                      data-ocid={`orders.delivered.item.${i + 1}`}
                     />
                   ))}
                 </div>
@@ -224,12 +434,16 @@ export function CustomerDashboard() {
                   Zilizoghairiwa ({grouped.cancelled.length})
                 </p>
                 <div className="space-y-3">
-                  {grouped.cancelled.map((o) => (
+                  {grouped.cancelled.map((o, i) => (
                     <OrderCard
                       key={o.id.toString()}
                       order={o}
                       shopName={getShopName(o.shopId)}
                       productName={getProductName(o.productId)}
+                      shopPaymentNumbers={getShopPaymentNumbers(o.shopId)}
+                      uploadProof={handleUploadProof}
+                      isUploading={uploadProofMutation.isPending}
+                      data-ocid={`orders.cancelled.item.${i + 1}`}
                     />
                   ))}
                 </div>

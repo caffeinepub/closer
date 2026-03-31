@@ -335,6 +335,25 @@ actor {
         };
         let newVal = not current;
         shopAvailability.add(shopId, newVal);
+        // Also update isActive on the shop for consistency
+        let updatedShop : Shop = {
+          id = shop.id;
+          name = shop.name;
+          description = shop.description;
+          address = shop.address;
+          latitude = shop.latitude;
+          longitude = shop.longitude;
+          tiktok = shop.tiktok;
+          whatsapp = shop.whatsapp;
+          instagram = shop.instagram;
+          facebook = shop.facebook;
+          owner = shop.owner;
+          logo = shop.logo;
+          paymentNumbers = shop.paymentNumbers;
+          subscriptionExpiry = shop.subscriptionExpiry;
+          isActive = newVal;
+        };
+        shops.add(shopId, updatedShop);
         newVal;
       };
     };
@@ -867,4 +886,61 @@ actor {
     accessControlState.adminAssigned := true;
     true
   };
+  // Admin confirms payment for an order
+  public shared ({ caller }) func confirmPayment(orderId : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can confirm payments");
+    };
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order does not exist") };
+      case (?order) {
+        let updated : Order = {
+          id = order.id;
+          customerId = order.customerId;
+          customerName = order.customerName;
+          customerPhone = order.customerPhone;
+          productId = order.productId;
+          shopId = order.shopId;
+          quantity = order.quantity;
+          totalPrice = order.totalPrice;
+          commissionAmount = order.commissionAmount;
+          status = order.status;
+          paymentStatus = "confirmed";
+          paymentProof = order.paymentProof;
+          paymentNote = order.paymentNote;
+        };
+        orders.add(orderId, updated);
+      };
+    };
+  };
+
+  // Admin rejects payment for an order
+  public shared ({ caller }) func rejectPayment(orderId : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can reject payments");
+    };
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order does not exist") };
+      case (?order) {
+        let updated : Order = {
+          id = order.id;
+          customerId = order.customerId;
+          customerName = order.customerName;
+          customerPhone = order.customerPhone;
+          productId = order.productId;
+          shopId = order.shopId;
+          quantity = order.quantity;
+          totalPrice = order.totalPrice;
+          commissionAmount = order.commissionAmount;
+          status = order.status;
+          paymentStatus = "rejected";
+          paymentProof = order.paymentProof;
+          paymentNote = order.paymentNote;
+        };
+        orders.add(orderId, updated);
+      };
+    };
+  };
+
+
 };

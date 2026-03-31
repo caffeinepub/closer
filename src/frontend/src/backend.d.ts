@@ -146,6 +146,8 @@ export interface backendInterface {
     submitAppFeedback(rating: bigint, comment: string): Promise<bigint>;
     getAppFeedbacks(): Promise<Array<AppFeedback>>;
     getAverageRating(): Promise<[bigint, bigint]>;
+    confirmPayment(orderId: bigint): Promise<void>;
+    rejectPayment(orderId: bigint): Promise<void>;
     claimAdminIfNoneYet(): Promise<boolean>;
     forceResetAndClaimAdmin(secret: string): Promise<boolean>;
     promoteUserToAdmin(user: Principal): Promise<void>;

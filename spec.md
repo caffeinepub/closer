@@ -1,29 +1,38 @@
 # Closer to Market
 
 ## Current State
-App is a Tanzanian marketplace with Shop Browser, Shop Owner Dashboard, Customer Dashboard, Admin Panel, and PWA support. Users can browse shops by category, place orders, and manage shops. Backend has full profile, shop, product, order, and notification management.
+- Shop owner dashboard has a Switch toggle for shop availability (`toggleShopAvailability`)
+- Backend `toggleShopAvailability` updates `shopAvailability` map but does NOT update `shop.isActive` field
+- `getActiveShops` and `getActiveShopsByCategory` filter by `shop.isActive` (always true) — not `isAvailable`
+- ShopBrowser filters by `isAvailable` on client side, so toggle does work for browsing
+- Backend has `uploadPaymentProof` and Order type has `paymentProof`, `paymentStatus`, `paymentNote` fields
+- AdminPanel orders tab shows order details but NOT payment proof, payment status, or payment note
+- CustomerDashboard has only a tiny hint for `paymentStatus === "confirmed"` — no upload UI
+- ShopBrowser shop detail modal does NOT show shop payment numbers (`paymentNumbers` field)
+- Backend has `updateOrderStatus` but no dedicated confirm/reject payment function
 
 ## Requested Changes (Diff)
 
 ### Add
-- AI Chat Assistant component (floating button, chat window) visible app-wide
-- Smart rule-based chatbot in Swahili/English helping with:
-  - Payment questions (how to pay, M-Pesa/Tigo Pesa instructions)
-  - Order placement and tracking help
-  - Shop registration help
-  - General app navigation help
-  - Admin recovery help
-- Chat available to both customers and shop owners
-- Context-aware: detects if user is shop owner or customer and tailors responses
+- Backend: `confirmPayment(orderId)` function — admin only, sets `paymentStatus = "confirmed"`
+- Backend: `rejectPayment(orderId)` function — admin only, sets `paymentStatus = "rejected"`
+- Frontend ShopBrowser: show shop `paymentNumbers` prominently in shop detail modal (green 💳 box)
+- Frontend CustomerDashboard: after placing order, show payment number of shop + button to upload payment proof (image + note)
+- Frontend AdminPanel orders tab: show `paymentStatus`, `paymentNote`, `paymentProof` image; add Confirm/Reject payment buttons
 
 ### Modify
-- App.tsx: render AiAssistant floating component globally
+- Backend: `toggleShopAvailability` — also update `shop.isActive` to keep both fields in sync
+- Backend: add `confirmPayment` and `rejectPayment` to IDL declarations
+- Frontend ShopOwnerDashboard: ensure toggle visually shows active/inactive state clearly
 
 ### Remove
-- Nothing removed
+- Nothing
 
 ## Implementation Plan
-1. Create `src/frontend/src/components/AiAssistant.tsx` -- floating chat bubble button + chat window
-2. Pre-programmed responses for: malipo (payments), maagizo (orders), duka (shop setup), admin, kutafuta bidhaa (product search), msaada wa jumla (general help)
-3. Quick reply buttons for common topics
-4. Integrate into App.tsx as a global floating overlay
+1. Update `toggleShopAvailability` in `main.mo` to also flip `shop.isActive`
+2. Add `confirmPayment` and `rejectPayment` functions in `main.mo` (admin-only, update `paymentStatus`)
+3. Add `confirmPayment` and `rejectPayment` to `backend.d.ts` interface
+4. Update `useQueries.ts` with `useConfirmPayment` and `useRejectPayment` hooks
+5. Update `ShopBrowser.tsx`: in shop detail modal, display `paymentNumbers` as green 💳 box
+6. Update `CustomerDashboard.tsx`: show shop payment number + upload proof button per order
+7. Update `AdminPanel.tsx`: in orders tab, show payment status badge, payment note, proof image thumbnail, and Confirm/Reject buttons

@@ -962,28 +962,45 @@ export function ShopOwnerDashboard() {
                   className="flex items-center justify-between mt-3 pt-3"
                   style={{ borderTop: "1px solid hsl(var(--border))" }}
                 >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{
-                        background:
-                          (myShop as ShopWithAvailability).isAvailable !== false
-                            ? "hsl(142,70%,45%)"
-                            : "hsl(var(--muted-foreground))",
-                      }}
-                    />
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full shrink-0 transition-colors"
+                        style={{
+                          background:
+                            (myShop as ShopWithAvailability).isAvailable !==
+                            false
+                              ? "hsl(142,70%,45%)"
+                              : "hsl(var(--muted-foreground))",
+                          boxShadow:
+                            (myShop as ShopWithAvailability).isAvailable !==
+                            false
+                              ? "0 0 6px hsl(142,70%,45%)"
+                              : "none",
+                        }}
+                      />
+                      <span
+                        className="text-sm font-bold"
+                        style={{
+                          color:
+                            (myShop as ShopWithAvailability).isAvailable !==
+                            false
+                              ? "hsl(142,70%,38%)"
+                              : "hsl(var(--muted-foreground))",
+                        }}
+                      >
+                        {(myShop as ShopWithAvailability).isAvailable !== false
+                          ? "Wazi / Open"
+                          : "Imefungwa / Closed"}
+                      </span>
+                    </div>
                     <span
-                      className="text-sm font-semibold"
-                      style={{
-                        color:
-                          (myShop as ShopWithAvailability).isAvailable !== false
-                            ? "hsl(142,70%,45%)"
-                            : "hsl(var(--muted-foreground))",
-                      }}
+                      className="text-xs"
+                      style={{ color: "hsl(var(--muted-foreground))" }}
                     >
                       {(myShop as ShopWithAvailability).isAvailable !== false
-                        ? "Wazi / Open"
-                        : "Imefungwa / Closed"}
+                        ? "Duka linaonekana kwa wateja"
+                        : "Duka halionekani kwa wateja"}
                     </span>
                   </div>
                   <Switch
