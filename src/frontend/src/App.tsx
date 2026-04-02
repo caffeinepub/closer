@@ -1,7 +1,14 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { AiAssistant } from "./components/AiAssistant";
 import { BottomNav, type Page } from "./components/BottomNav";
@@ -31,6 +38,8 @@ const AdminPanel = lazy(() =>
   import("./pages/AdminPanel").then((m) => ({ default: m.AdminPanel })),
 );
 
+const PAGE_KEY = "ctm_last_page";
+
 function PageLoader() {
   return (
     <div
@@ -49,13 +58,27 @@ function PageLoader() {
 function AppInner() {
   const { identity, isInitializing } = useInternetIdentity();
   const isLoggedIn = !!identity;
-  const [page, setPage] = useState<Page>("browser");
-  const [mounted, setMounted] = useState<Set<Page>>(new Set(["browser"]));
   const { actor } = useActor();
   const qc = useQueryClient();
 
   const { data: profile, isLoading: profileLoading } = useMyProfile();
   const { data: isAdmin } = useIsAdmin();
+
+  // Restore last visited page from localStorage
+  const savedPage = (localStorage.getItem(PAGE_KEY) as Page) || "browser";
+  const validPages: Page[] = ["browser", "orders", "office", "admin"];
+  const initialPage = validPages.includes(savedPage) ? savedPage : "browser";
+
+  const [page, setPage] = useState<Page>(initialPage);
+  const [mounted, setMounted] = useState<Set<Page>>(
+    new Set([initialPage, "browser"]),
+  );
+
+  // Persist page changes to localStorage
+  const handleSetPage = useCallback((p: Page) => {
+    setPage(p);
+    localStorage.setItem(PAGE_KEY, p);
+  }, []);
 
   // Auto-claim admin for first registered user if no admin yet.
   const autoClaimDone = useRef(false);
@@ -101,6 +124,13 @@ function AppInner() {
       }
     }
   }, [profile]);
+
+  // If admin page was saved but user lost admin status, fall back to browser
+  useEffect(() => {
+    if (page === "admin" && isAdmin === false) {
+      handleSetPage("browser");
+    }
+  }, [isAdmin, page, handleSetPage]);
 
   if (isInitializing) {
     return <PageLoader />;
@@ -179,7 +209,7 @@ function AppInner() {
           )}
         </Suspense>
       </main>
-      <BottomNav current={page} onChange={setPage} isAdmin={!!isAdmin} />
+      <BottomNav current={page} onChange={handleSetPage} isAdmin={!!isAdmin} />
       <AiAssistant />
     </div>
   );
