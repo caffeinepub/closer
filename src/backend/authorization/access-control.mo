@@ -37,12 +37,13 @@ module {
     };
   };
 
-  // Returns #guest for unknown users instead of trapping -- this is the safe default
   public func getUserRole(state : AccessControlState, caller : Principal) : UserRole {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
-      case (null) { #guest };
+      case (null) {
+        Runtime.trap("User is not registered");
+      };
     };
   };
 

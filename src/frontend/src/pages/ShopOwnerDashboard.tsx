@@ -50,6 +50,7 @@ import { BUSINESS_CATEGORIES } from "../constants/categories";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAllShops,
+  useConfirmPayment,
   useCreateProduct,
   useCreateShop,
   useDeleteProduct,
@@ -57,6 +58,7 @@ import {
   useMarkNotificationRead,
   useMyNotifications,
   useMyProfile,
+  useRejectPayment,
   useShopOrders,
   useShopProducts,
   useToggleShopAvailability,
@@ -475,6 +477,8 @@ export function ShopOwnerDashboard() {
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const updateOrderStatus = useUpdateOrderStatus();
+  const confirmPaymentMutation = useConfirmPayment();
+  const rejectPaymentMutation = useRejectPayment();
   const markRead = useMarkNotificationRead();
 
   const [showShopForm, setShowShopForm] = useState(false);
@@ -1220,6 +1224,20 @@ export function ShopOwnerDashboard() {
                           },
                         )
                       }
+                      onConfirmPayment={() =>
+                        confirmPaymentMutation.mutate(order.id, {
+                          onSuccess: () =>
+                            toast.success("Malipo yamethibitishwa!"),
+                          onError: () => toast.error("Hitilafu — jaribu tena"),
+                        })
+                      }
+                      onRejectPayment={() =>
+                        rejectPaymentMutation.mutate(order.id, {
+                          onSuccess: () =>
+                            toast.success("Malipo yamekataliwa."),
+                          onError: () => toast.error("Hitilafu — jaribu tena"),
+                        })
+                      }
                     />
                   ))
                 )}
@@ -1513,11 +1531,15 @@ function OrderRow({
   idx,
   productName,
   onStatusChange,
+  onConfirmPayment,
+  onRejectPayment,
 }: {
   order: Order;
   idx: number;
   productName: string;
   onStatusChange: (s: string) => void;
+  onConfirmPayment?: () => void;
+  onRejectPayment?: () => void;
 }) {
   const statuses = [
     "pending",
@@ -1589,10 +1611,57 @@ function OrderRow({
           </SelectContent>
         </Select>
       </div>
-      {order.paymentProof && (
-        <p className="text-xs" style={{ color: "hsl(120,50%,45%)" }}>
-          ✓ Uthibitisho wa malipo umepokewa
-        </p>
+      {/* Payment proof / note from customer */}
+      {(order.paymentNote || order.paymentProof) && (
+        <div
+          className="rounded-lg p-2 space-y-1.5 text-xs border"
+          style={{
+            background: "hsl(45,90%,96%)",
+            borderColor: "hsl(45,80%,80%)",
+          }}
+        >
+          <p className="font-semibold" style={{ color: "hsl(35,70%,30%)" }}>
+            💳 Uthibitisho wa Malipo
+          </p>
+          {order.paymentNote && (
+            <p style={{ color: "hsl(35,60%,30%)" }}>📝 {order.paymentNote}</p>
+          )}
+          {order.paymentProof && (
+            <p style={{ color: "hsl(120,50%,35%)" }}>
+              📷 Picha ya uthibitisho imepakiwa
+            </p>
+          )}
+          {order.paymentStatus === "pending" && (
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onConfirmPayment}
+                className="flex-1 rounded py-1.5 text-xs font-medium"
+                style={{ background: "hsl(142,60%,42%)", color: "#fff" }}
+              >
+                ✅ Thibitisha
+              </button>
+              <button
+                type="button"
+                onClick={onRejectPayment}
+                className="flex-1 rounded py-1.5 text-xs font-medium"
+                style={{ background: "hsl(0,70%,50%)", color: "#fff" }}
+              >
+                ❌ Kataa
+              </button>
+            </div>
+          )}
+          {order.paymentStatus === "confirmed" && (
+            <p className="font-medium" style={{ color: "hsl(142,60%,35%)" }}>
+              ✅ Malipo yamethibitishwa
+            </p>
+          )}
+          {order.paymentStatus === "rejected" && (
+            <p className="font-medium" style={{ color: "hsl(0,70%,45%)" }}>
+              ❌ Malipo yamekataliwa
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

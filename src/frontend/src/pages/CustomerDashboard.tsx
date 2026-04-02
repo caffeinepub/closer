@@ -15,6 +15,7 @@ import {
   useAllProducts,
   useAllShops,
   useMyOrders,
+  useUpdatePaymentNote,
   useUpdatePaymentProof,
 } from "../hooks/useQueries";
 
@@ -305,6 +306,7 @@ export function CustomerDashboard() {
   const { data: shops } = useAllShops();
   const { data: products } = useAllProducts();
   const uploadProofMutation = useUpdatePaymentProof();
+  const updateNoteMutation = useUpdatePaymentNote();
 
   const getShopName = (shopId: bigint) =>
     shops?.find((s) => s.id === shopId)?.name || `Duka #${shopId}`;
@@ -318,13 +320,25 @@ export function CustomerDashboard() {
     file: File | null,
     note: string,
   ) => {
-    uploadProofMutation.mutate(
-      { orderId, file, paymentNote: note },
-      {
-        onSuccess: () => toast.success("Uthibitisho umetumwa kwa mafanikio!"),
-        onError: () => toast.error("Hitilafu — jaribu tena"),
-      },
-    );
+    if (file) {
+      // Has image: use uploadPaymentProof
+      uploadProofMutation.mutate(
+        { orderId, file, paymentNote: note },
+        {
+          onSuccess: () => toast.success("Uthibitisho umetumwa kwa mafanikio!"),
+          onError: () => toast.error("Hitilafu — jaribu tena"),
+        },
+      );
+    } else if (note.trim()) {
+      // Text only: use updatePaymentNote (no blob needed)
+      updateNoteMutation.mutate(
+        { orderId, paymentNote: note },
+        {
+          onSuccess: () => toast.success("Uthibitisho umetumwa kwa mafanikio!"),
+          onError: () => toast.error("Hitilafu — jaribu tena"),
+        },
+      );
+    }
   };
 
   const grouped = {
@@ -405,7 +419,10 @@ export function CustomerDashboard() {
                       productName={getProductName(o.productId)}
                       shopPaymentNumbers={getShopPaymentNumbers(o.shopId)}
                       uploadProof={handleUploadProof}
-                      isUploading={uploadProofMutation.isPending}
+                      isUploading={
+                        uploadProofMutation.isPending ||
+                        updateNoteMutation.isPending
+                      }
                       data-ocid={`orders.item.${i + 1}`}
                     />
                   ))}
@@ -429,7 +446,10 @@ export function CustomerDashboard() {
                       productName={getProductName(o.productId)}
                       shopPaymentNumbers={getShopPaymentNumbers(o.shopId)}
                       uploadProof={handleUploadProof}
-                      isUploading={uploadProofMutation.isPending}
+                      isUploading={
+                        uploadProofMutation.isPending ||
+                        updateNoteMutation.isPending
+                      }
                       data-ocid={`orders.delivered.item.${i + 1}`}
                     />
                   ))}
@@ -453,7 +473,10 @@ export function CustomerDashboard() {
                       productName={getProductName(o.productId)}
                       shopPaymentNumbers={getShopPaymentNumbers(o.shopId)}
                       uploadProof={handleUploadProof}
-                      isUploading={uploadProofMutation.isPending}
+                      isUploading={
+                        uploadProofMutation.isPending ||
+                        updateNoteMutation.isPending
+                      }
                       data-ocid={`orders.cancelled.item.${i + 1}`}
                     />
                   ))}
