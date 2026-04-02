@@ -70,6 +70,9 @@ export function ProfileSetup() {
         }
       }
 
+      // Force-refresh admin status from backend
+      await qc.invalidateQueries({ queryKey: ["isAdmin"] });
+      await qc.refetchQueries({ queryKey: ["isAdmin"] });
       await qc.invalidateQueries();
 
       if (isAdminNow) {

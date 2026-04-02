@@ -216,6 +216,8 @@ export const idlService = IDL.Service({
   'updateShopLogo' : IDL.Func([IDL.Nat, ExternalBlob], [], []),
   'updateShopPaymentNumbers' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'uploadPaymentProof' : IDL.Func([IDL.Nat, ExternalBlob, IDL.Text], [], []),
+  'confirmPayment' : IDL.Func([IDL.Nat], [], []),
+  'rejectPayment' : IDL.Func([IDL.Nat], [], []),
 });
 
 export const idlInitArgs = [];
@@ -424,6 +426,8 @@ export const idlFactory = ({ IDL }) => {
     'updateShopLogo' : IDL.Func([IDL.Nat, ExternalBlob], [], []),
     'updateShopPaymentNumbers' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'uploadPaymentProof' : IDL.Func([IDL.Nat, ExternalBlob, IDL.Text], [], []),
+    'confirmPayment' : IDL.Func([IDL.Nat], [], []),
+    'rejectPayment' : IDL.Func([IDL.Nat], [], []),
   });
 };
 

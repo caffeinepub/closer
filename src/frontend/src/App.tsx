@@ -80,22 +80,25 @@ function AppInner() {
     localStorage.setItem(PAGE_KEY, p);
   }, []);
 
-  // Auto-claim admin for first registered user if no admin yet.
+  // After login, always refresh admin status from backend (no cache).
   const autoClaimDone = useRef(false);
   useEffect(() => {
     if (!actor || !isLoggedIn || autoClaimDone.current) return;
     autoClaimDone.current = true;
     (async () => {
       try {
+        // Always re-check admin status from backend after login
+        await qc.invalidateQueries({ queryKey: ["isAdmin"] });
+        await qc.refetchQueries({ queryKey: ["isAdmin"] });
         const alreadyAdmin = await actor.isCallerAdmin();
         if (alreadyAdmin) {
-          await qc.invalidateQueries({ queryKey: ["isAdmin"] });
           return;
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const claimed = await (actor as any).claimAdminIfNoneYet();
+        // Try to claim admin if no admin exists yet
+        const claimed = await actor.claimAdminIfNoneYet();
         if (claimed) {
-          await qc.invalidateQueries();
+          await qc.invalidateQueries({ queryKey: ["isAdmin"] });
+          await qc.refetchQueries({ queryKey: ["isAdmin"] });
           toast.success("✅ Umepata haki za Admin!", { duration: 5000 });
         }
       } catch {

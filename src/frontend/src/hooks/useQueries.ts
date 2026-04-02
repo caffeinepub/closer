@@ -137,6 +137,7 @@ export function useIsAdmin() {
       }
     },
     enabled: !!actor && !isFetching,
+    staleTime: 0,
     // Retry so that after registration the admin status is refreshed
     retry: 3,
     retryDelay: 1000,
@@ -582,11 +583,12 @@ export function useConfirmPayment() {
   return useMutation({
     mutationFn: async (orderId: bigint) => {
       if (!actor) throw new Error("Not connected");
-      return (actor as any).confirmPayment(orderId);
+      return actor.confirmPayment(orderId);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["allOrdersAdmin"] });
       qc.invalidateQueries({ queryKey: ["myOrders"] });
+      qc.invalidateQueries({ queryKey: ["shopOrders"] });
     },
   });
 }
@@ -597,11 +599,12 @@ export function useRejectPayment() {
   return useMutation({
     mutationFn: async (orderId: bigint) => {
       if (!actor) throw new Error("Not connected");
-      return (actor as any).rejectPayment(orderId);
+      return actor.rejectPayment(orderId);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["allOrdersAdmin"] });
       qc.invalidateQueries({ queryKey: ["myOrders"] });
+      qc.invalidateQueries({ queryKey: ["shopOrders"] });
     },
   });
 }

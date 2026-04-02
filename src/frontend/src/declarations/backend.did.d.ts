@@ -177,6 +177,8 @@ export interface _SERVICE {
   'updateShopLogo' : ActorMethod<[bigint, ExternalBlob], undefined>,
   'updateShopPaymentNumbers' : ActorMethod<[bigint, string], undefined>,
   'uploadPaymentProof' : ActorMethod<[bigint, ExternalBlob, string], undefined>,
+  'confirmPayment' : ActorMethod<[bigint], undefined>,
+  'rejectPayment' : ActorMethod<[bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

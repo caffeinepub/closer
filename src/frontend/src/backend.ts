@@ -224,6 +224,18 @@ export interface backendInterface {
     updateShopLogo(shopId: bigint, shopLogo: ExternalBlob): Promise<void>;
     updateShopPaymentNumbers(shopId: bigint, paymentNumbers: string): Promise<void>;
     uploadPaymentProof(orderId: bigint, paymentProof: ExternalBlob, paymentNote: string): Promise<void>;
+    confirmPayment(orderId: bigint): Promise<void>;
+    rejectPayment(orderId: bigint): Promise<void>;
+    claimAdminIfNoneYet(): Promise<boolean>;
+    forceResetAndClaimAdmin(secret: string): Promise<boolean>;
+    promoteUserToAdmin(user: Principal): Promise<void>;
+    toggleShopAvailability(shopId: bigint): Promise<boolean>;
+    getAllOrdersAdmin(): Promise<Array<Order>>;
+    getActiveShopsByCategory(category: string): Promise<Array<Shop>>;
+    getShopsByCategory(category: string): Promise<Array<Shop>>;
+    submitAppFeedback(rating: bigint, comment: string): Promise<bigint>;
+    getAppFeedbacks(): Promise<Array<any>>;
+    getAverageRating(): Promise<[bigint, bigint]>;
 }
 import type { ExternalBlob as _ExternalBlob, Order as _Order, Product as _Product, Shop as _Shop, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -898,6 +910,126 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.uploadPaymentProof(arg0, await to_candid_ExternalBlob_n10(this._uploadFile, this._downloadFile, arg1), arg2);
             return result;
+        }
+    }
+    async confirmPayment(orderId: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                return await this.actor.confirmPayment(orderId);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.confirmPayment(orderId);
+        }
+    }
+    async rejectPayment(orderId: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                return await this.actor.rejectPayment(orderId);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.rejectPayment(orderId);
+        }
+    }
+    async claimAdminIfNoneYet(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                return await this.actor.claimAdminIfNoneYet();
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.claimAdminIfNoneYet();
+        }
+    }
+    async forceResetAndClaimAdmin(secret: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                return await this.actor.forceResetAndClaimAdmin(secret);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.forceResetAndClaimAdmin(secret);
+        }
+    }
+    async promoteUserToAdmin(user: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                return await this.actor.promoteUserToAdmin(user);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.promoteUserToAdmin(user);
+        }
+    }
+    async toggleShopAvailability(shopId: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                return await this.actor.toggleShopAvailability(shopId);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.toggleShopAvailability(shopId);
+        }
+    }
+    async getAllOrdersAdmin(): Promise<Array<Order>> {
+        const results = this.processError ? await (async () => { try { return await this.actor.getAllOrdersAdmin(); } catch(e) { this.processError!(e); throw new Error("unreachable"); } })() : await this.actor.getAllOrdersAdmin();
+        return Promise.all(results.map(r => from_candid_Order_n27(this._uploadFile, this._downloadFile, r)));
+    }
+    async getActiveShopsByCategory(category: string): Promise<Array<Shop>> {
+        const results = this.processError ? await (async () => { try { return await this.actor.getActiveShopsByCategory(category); } catch(e) { this.processError!(e); throw new Error("unreachable"); } })() : await this.actor.getActiveShopsByCategory(category);
+        return Promise.all(results.map(r => from_candid_Shop_n12(this._uploadFile, this._downloadFile, r)));
+    }
+    async getShopsByCategory(category: string): Promise<Array<Shop>> {
+        const results = this.processError ? await (async () => { try { return await this.actor.getShopsByCategory(category); } catch(e) { this.processError!(e); throw new Error("unreachable"); } })() : await this.actor.getShopsByCategory(category);
+        return Promise.all(results.map(r => from_candid_Shop_n12(this._uploadFile, this._downloadFile, r)));
+    }
+    async submitAppFeedback(rating: bigint, comment: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                return await this.actor.submitAppFeedback(rating, comment);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.submitAppFeedback(rating, comment);
+        }
+    }
+    async getAppFeedbacks(): Promise<Array<any>> {
+        if (this.processError) {
+            try {
+                return await this.actor.getAppFeedbacks() as any;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.getAppFeedbacks() as any;
+        }
+    }
+    async getAverageRating(): Promise<[bigint, bigint]> {
+        if (this.processError) {
+            try {
+                return await this.actor.getAverageRating();
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.getAverageRating();
         }
     }
 }
