@@ -410,7 +410,19 @@ function AdminOrderCard({
       </div>
 
       {/* Payment note */}
-      {order.paymentNote && (
+      {!proofUrl && order.paymentNote && (
+        <div
+          className="rounded-lg px-3 py-2 text-xs font-medium"
+          style={{
+            background: "hsl(45,90%,95%)",
+            color: "hsl(35,80%,35%)",
+            border: "1px solid hsl(45,80%,80%)",
+          }}
+        >
+          📝 Uthibitisho wa maandishi: {order.paymentNote}
+        </div>
+      )}
+      {proofUrl && order.paymentNote && (
         <p
           className="text-xs rounded-lg px-2 py-1"
           style={{
@@ -451,7 +463,7 @@ function AdminOrderCard({
       )}
 
       {/* Confirm / Reject buttons — only when proof is pending */}
-      {isPending && proofBlob && (
+      {isPending && (proofBlob || order.paymentNote) && (
         <div className="flex gap-2 pt-1">
           <Button
             size="sm"

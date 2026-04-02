@@ -449,10 +449,15 @@ export function useUpdatePaymentProof() {
       orderId,
       file,
       paymentNote,
-    }: { orderId: bigint; file: File; paymentNote?: string }) => {
+    }: { orderId: bigint; file: File | null; paymentNote?: string }) => {
       if (!actor) throw new Error("Not connected");
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const blob = ExternalBlob.fromBytes(bytes);
+      let blob: ExternalBlob;
+      if (file) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        blob = ExternalBlob.fromBytes(bytes);
+      } else {
+        blob = ExternalBlob.fromBytes(new Uint8Array(0));
+      }
       return actor.uploadPaymentProof(orderId, blob, paymentNote || "");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["myOrders"] }),

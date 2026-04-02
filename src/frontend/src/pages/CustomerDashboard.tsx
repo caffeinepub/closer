@@ -88,7 +88,7 @@ function OrderCard({
   shopName: string;
   productName: string;
   shopPaymentNumbers: string;
-  uploadProof: (orderId: bigint, file: File, note: string) => void;
+  uploadProof: (orderId: bigint, file: File | null, note: string) => void;
   isUploading: boolean;
 }) {
   const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
@@ -102,11 +102,12 @@ function OrderCard({
   const canUpload =
     order.paymentStatus !== "confirmed" && order.paymentStatus !== "rejected";
   const hasProofPending =
-    order.paymentStatus === "pending" && order.paymentProof;
+    order.paymentStatus === "pending" &&
+    (order.paymentProof || order.paymentNote);
 
   const handleSubmitProof = () => {
-    if (!selectedFile) {
-      toast.error("Chagua picha ya uthibitisho wa malipo");
+    if (!selectedFile && !proofNote.trim()) {
+      toast.error("Andika maandishi au chagua picha ya uthibitisho");
       return;
     }
     uploadProof(order.id, selectedFile, proofNote);
@@ -204,7 +205,13 @@ function OrderCard({
                 className="text-xs font-semibold"
                 style={{ color: "hsl(var(--foreground))" }}
               >
-                📎 Pakia Uthibitisho wa Malipo
+                📎 Tuma Uthibitisho wa Malipo
+              </p>
+              <p
+                className="text-xs"
+                style={{ color: "hsl(var(--muted-foreground))" }}
+              >
+                Pakia picha AU andika maandishi ya uthibitisho
               </p>
               <input
                 ref={fileRef}
@@ -236,7 +243,7 @@ function OrderCard({
               <Input
                 value={proofNote}
                 onChange={(e) => setProofNote(e.target.value)}
-                placeholder="Nambari ya muamala, maelezo..."
+                placeholder="Nambari ya muamala, neno la uthibitisho..."
                 className="text-xs h-8"
                 data-ocid="orders.proof.input"
               />
@@ -245,7 +252,7 @@ function OrderCard({
                   size="sm"
                   className="flex-1 text-xs h-8"
                   onClick={handleSubmitProof}
-                  disabled={isUploading || !selectedFile}
+                  disabled={isUploading || (!selectedFile && !proofNote.trim())}
                   style={{
                     background: "linear-gradient(135deg, #1565C0, #6A1B9A)",
                     color: "#fff",
@@ -284,7 +291,7 @@ function OrderCard({
               }}
               data-ocid="orders.proof.open_modal_button"
             >
-              📎 Pakia Uthibitisho wa Malipo
+              📎 Tuma Uthibitisho wa Malipo
             </Button>
           )}
         </div>
@@ -306,7 +313,11 @@ export function CustomerDashboard() {
   const getShopPaymentNumbers = (shopId: bigint) =>
     shops?.find((s) => s.id === shopId)?.paymentNumbers || "";
 
-  const handleUploadProof = (orderId: bigint, file: File, note: string) => {
+  const handleUploadProof = (
+    orderId: bigint,
+    file: File | null,
+    note: string,
+  ) => {
     uploadProofMutation.mutate(
       { orderId, file, paymentNote: note },
       {
