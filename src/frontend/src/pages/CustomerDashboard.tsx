@@ -119,10 +119,9 @@ function OrderCard({
 
   return (
     <div
-      className="rounded-xl p-4 border space-y-3"
+      className="rounded-xl p-4 space-y-3"
       style={{
         background: "hsl(var(--card))",
-        borderColor: "hsl(var(--border))",
       }}
     >
       {/* Order header */}
@@ -195,10 +194,9 @@ function OrderCard({
         <div>
           {showUpload ? (
             <div
-              className="space-y-2 rounded-xl p-3 border"
+              className="space-y-2 rounded-xl p-3"
               style={{
                 background: "hsl(var(--muted))",
-                borderColor: "hsl(var(--border))",
               }}
               data-ocid="orders.proof.panel"
             >

@@ -17,7 +17,13 @@ export default function AuthPage() {
   const { setPage, setRole, setProfile, setIsAuthenticated } = useAuth();
 
   const [step, setStep] = useState<"connect" | "profile">("connect");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => {
+    try {
+      return localStorage.getItem("ctm_user_name") || "";
+    } catch {
+      return "";
+    }
+  });
   const [email, setEmail] = useState("");
   const [adminSecret, setAdminSecret] = useState("");
   const [saving, setSaving] = useState(false);
@@ -91,6 +97,9 @@ export default function AuthPage() {
       }
 
       await actor.registerProfile(name.trim(), "", email.trim(), "dark");
+      try {
+        localStorage.setItem("ctm_user_name", name.trim());
+      } catch {}
       const [role, profile] = await Promise.all([
         actor.getCallerUserRole(),
         actor.getMyProfile(),
@@ -123,7 +132,7 @@ export default function AuthPage() {
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md bg-card border border-border rounded-2xl p-8 flex flex-col gap-6"
+        className="w-full max-w-md bg-card rounded-2xl p-8 flex flex-col gap-6"
         data-ocid="auth.modal"
       >
         <div className="text-center">

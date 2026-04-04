@@ -117,6 +117,15 @@ function AppInner() {
     });
   }, [page]);
 
+  // Cache profile name to localStorage
+  useEffect(() => {
+    if (profile?.name) {
+      try {
+        localStorage.setItem("ctm_profile_name", profile.name);
+      } catch {}
+    }
+  }, [profile]);
+
   // Sync theme from profile
   useEffect(() => {
     if (profile?.preferredTheme) {

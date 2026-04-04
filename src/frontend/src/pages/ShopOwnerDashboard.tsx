@@ -117,11 +117,27 @@ function ShopForm({
   isPending: boolean;
   onCancel?: () => void;
 }) {
-  const [form, setForm] = useState<ShopFormData>(initial || emptyShopForm());
+  const [form, setForm] = useState<ShopFormData>(() => {
+    if (initial) return initial;
+    try {
+      const draft = localStorage.getItem("ctm_shop_draft");
+      if (draft) return { ...emptyShopForm(), ...JSON.parse(draft) };
+    } catch {}
+    return emptyShopForm();
+  });
   const set =
     (k: keyof ShopFormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // Save draft to localStorage on every change (only for new shop, not edit)
+  useEffect(() => {
+    if (!initial) {
+      try {
+        localStorage.setItem("ctm_shop_draft", JSON.stringify(form));
+      } catch {}
+    }
+  }, [form, initial]);
 
   return (
     <div className="space-y-3">
@@ -452,6 +468,24 @@ export function ShopOwnerDashboard() {
   const { data: orders } = useShopOrders(myShop?.id || null);
   const { data: notifications } = useMyNotifications();
 
+  // Cache shop info to localStorage as backup (for pre-filling after redeploy)
+  useEffect(() => {
+    if (myShop) {
+      try {
+        localStorage.setItem(
+          "ctm_my_shop_backup",
+          JSON.stringify({
+            name: myShop.name,
+            address: myShop.address,
+            paymentNumbers: myShop.paymentNumbers || "",
+            category: (myShop as any).category || "",
+            description: myShop.description || "",
+          }),
+        );
+      } catch {}
+    }
+  }, [myShop]);
+
   const createShop = useCreateShop();
   const updateShop = useUpdateShop();
   const deleteShop = useDeleteShop();
@@ -537,6 +571,9 @@ export function ShopOwnerDashboard() {
             });
           }
           toast.success("Duka limeundwa!");
+          try {
+            localStorage.removeItem("ctm_shop_draft");
+          } catch {}
           setShowShopForm(false);
         },
         onError: () => toast.error("Hitilafu — jaribu tena"),
@@ -719,10 +756,9 @@ export function ShopOwnerDashboard() {
           <div className="px-4 py-6">
             {!showShopForm ? (
               <div
-                className="rounded-2xl p-6 text-center border"
+                className="rounded-2xl p-6 text-center"
                 style={{
                   background: "hsl(var(--card))",
-                  borderColor: "hsl(var(--border))",
                 }}
                 data-ocid="office.no_shop.panel"
               >
@@ -757,10 +793,9 @@ export function ShopOwnerDashboard() {
               </div>
             ) : (
               <div
-                className="rounded-2xl p-4 border"
+                className="rounded-2xl p-4"
                 style={{
                   background: "hsl(var(--card))",
-                  borderColor: "hsl(var(--border))",
                 }}
               >
                 <h2
@@ -769,6 +804,29 @@ export function ShopOwnerDashboard() {
                 >
                   Duka Jipya
                 </h2>
+                {(() => {
+                  try {
+                    const backup = localStorage.getItem("ctm_my_shop_backup");
+                    if (backup) {
+                      const b = JSON.parse(backup);
+                      if (b.name)
+                        return (
+                          <div
+                            className="mb-3 rounded-xl px-3 py-2 text-xs"
+                            style={{
+                              background: "hsl(48,90%,95%)",
+                              color: "hsl(40,60%,30%)",
+                            }}
+                          >
+                            💾 Taarifa zilizohifadhiwa:{" "}
+                            <strong>{b.name}</strong> ({b.address || "—"}) —
+                            fomu imejazwa kiotomatiki.
+                          </div>
+                        );
+                    }
+                  } catch {}
+                  return null;
+                })()}
                 <ShopForm
                   onSubmit={handleCreateShop}
                   isPending={createShop.isPending}
@@ -783,10 +841,9 @@ export function ShopOwnerDashboard() {
             {/* Shop card */}
             {editingShop ? (
               <div
-                className="rounded-2xl p-4 border mb-4"
+                className="rounded-2xl p-4 mb-4"
                 style={{
                   background: "hsl(var(--card))",
-                  borderColor: "hsl(var(--border))",
                 }}
               >
                 <h2
@@ -816,10 +873,9 @@ export function ShopOwnerDashboard() {
               </div>
             ) : (
               <div
-                className="rounded-2xl p-4 border mb-4"
+                className="rounded-2xl p-4 mb-4"
                 style={{
                   background: "hsl(var(--card))",
-                  borderColor: "hsl(var(--border))",
                 }}
                 data-ocid="office.shop.card"
               >
@@ -1091,10 +1147,9 @@ export function ShopOwnerDashboard() {
                     {(products || []).map((p, i) => (
                       <div
                         key={p.id.toString()}
-                        className="rounded-xl overflow-hidden border"
+                        className="rounded-xl overflow-hidden"
                         style={{
                           background: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
                         }}
                         data-ocid={`office.product.item.${i + 1}`}
                       >
@@ -1247,7 +1302,6 @@ export function ShopOwnerDashboard() {
                 <div
                   style={{
                     background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
                     borderRadius: 12,
                     padding: 20,
                   }}
@@ -1557,10 +1611,9 @@ function OrderRow({
   };
   return (
     <div
-      className="rounded-xl p-3 border space-y-2"
+      className="rounded-xl p-3 space-y-2"
       style={{
         background: "hsl(var(--card))",
-        borderColor: "hsl(var(--border))",
       }}
       data-ocid={`office.order.item.${idx + 1}`}
     >

@@ -149,10 +149,9 @@ function UserCard({
 
   return (
     <div
-      className="rounded-xl border p-3 flex items-start gap-3"
+      className="rounded-xl p-3 flex items-start gap-3"
       style={{
         background: "hsl(var(--card))",
-        borderColor: "hsl(var(--border))",
       }}
       data-ocid={`admin.users.item.${idx + 1}`}
     >
@@ -184,10 +183,9 @@ function UserCard({
 function ShopCard({ shop, idx }: { shop: Shop; idx: number }) {
   return (
     <div
-      className="rounded-xl border p-3 space-y-1.5"
+      className="rounded-xl p-3 space-y-1.5"
       style={{
         background: "hsl(var(--card))",
-        borderColor: "hsl(var(--border))",
       }}
       data-ocid={`admin.shops.item.${idx + 1}`}
     >
@@ -225,10 +223,9 @@ function ShopCard({ shop, idx }: { shop: Shop; idx: number }) {
 function ProductCard({ product, idx }: { product: Product; idx: number }) {
   return (
     <div
-      className="rounded-xl border p-3 space-y-1.5"
+      className="rounded-xl p-3 space-y-1.5"
       style={{
         background: "hsl(var(--card))",
-        borderColor: "hsl(var(--border))",
       }}
       data-ocid={`admin.products.item.${idx + 1}`}
     >
@@ -361,10 +358,9 @@ function AdminOrderCard({
 
   return (
     <div
-      className="rounded-xl border p-3 space-y-2"
+      className="rounded-xl p-3 space-y-2"
       style={{
         background: "hsl(var(--card))",
-        borderColor: "hsl(var(--border))",
       }}
       data-ocid={`admin.orders.item.${idx + 1}`}
     >
@@ -781,10 +777,9 @@ export function AdminPanel() {
           {/* ── Settings ── */}
           <TabsContent value="settings" data-ocid="admin.settings.panel">
             <div
-              className="rounded-2xl p-4 border"
+              className="rounded-2xl p-4"
               style={{
                 background: "hsl(var(--card))",
-                borderColor: "hsl(var(--border))",
               }}
             >
               <div className="flex items-center gap-2 mb-4">

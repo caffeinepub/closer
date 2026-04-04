@@ -82,10 +82,9 @@ function ProductCard({
   const [imgLoaded, setImgLoaded] = useState(false);
   return (
     <div
-      className="rounded-xl overflow-hidden border"
+      className="rounded-xl overflow-hidden"
       style={{
         background: "hsl(var(--muted))",
-        borderColor: "hsl(var(--border))",
       }}
     >
       <div
@@ -173,10 +172,9 @@ function ShopCard({
       type="button"
       onClick={() => onSelect(shop)}
       data-ocid={`browser.shop.item.${idx + 1}`}
-      className="w-full text-left rounded-xl p-3 border transition-all active:scale-[0.98]"
+      className="w-full text-left rounded-xl p-3 transition-all active:scale-[0.98]"
       style={{
         background: "hsl(var(--card))",
-        borderColor: "hsl(var(--border))",
         WebkitTapHighlightColor: "transparent",
         touchAction: "manipulation",
       }}
@@ -502,10 +500,9 @@ function ShopModal({
         {/* Order confirm */}
         {orderProduct && (
           <div
-            className="mt-4 p-4 rounded-xl border"
+            className="mt-4 p-4 rounded-xl"
             style={{
               background: "hsl(var(--muted))",
-              borderColor: "hsl(var(--border))",
             }}
             data-ocid="order_confirm.panel"
           >
@@ -598,7 +595,15 @@ function ShopModal({
 }
 
 export function ShopBrowser() {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(
+    () => {
+      try {
+        return localStorage.getItem("ctm_last_category") || null;
+      } catch {
+        return null;
+      }
+    },
+  );
   const { data: allActiveShops, isLoading: allLoading } = useActiveShops();
   const { data: categoryShops, isLoading: catLoading } =
     useActiveShopsByCategory(selectedCategory);
@@ -715,7 +720,12 @@ export function ShopBrowser() {
           {/* All button */}
           <button
             type="button"
-            onClick={() => setSelectedCategory(null)}
+            onClick={() => {
+              setSelectedCategory(null);
+              try {
+                localStorage.removeItem("ctm_last_category");
+              } catch {}
+            }}
             data-ocid="browser.category_all.toggle"
             className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
             style={{
@@ -740,9 +750,14 @@ export function ShopBrowser() {
             <button
               key={cat.id}
               type="button"
-              onClick={() =>
-                setSelectedCategory(selectedCategory === cat.id ? null : cat.id)
-              }
+              onClick={() => {
+                const next = selectedCategory === cat.id ? null : cat.id;
+                setSelectedCategory(next);
+                try {
+                  if (next) localStorage.setItem("ctm_last_category", next);
+                  else localStorage.removeItem("ctm_last_category");
+                } catch {}
+              }}
               data-ocid={`browser.category_${cat.id}.toggle`}
               className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
               style={{
