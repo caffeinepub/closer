@@ -26,15 +26,35 @@ export type Status =
   | "loginError";
 
 export type InternetIdentityContext = {
+  /** The identity is available after successfully loading the identity from local storage
+   * or completing the login process. */
   identity?: Identity;
+
+  /** Connect to Internet Identity to login the user. */
   login: () => void;
+
+  /** Clears the identity from the state and local storage. Effectively "logs the user out". */
   clear: () => void;
+
+  /** The loginStatus of the login process. Note: The login loginStatus is not affected when a stored
+   * identity is loaded on mount. */
   loginStatus: Status;
+
+  /** `loginStatus === "initializing"` */
   isInitializing: boolean;
+
+  /** `loginStatus === "idle"` */
   isLoginIdle: boolean;
+
+  /** `loginStatus === "logging-in"` */
   isLoggingIn: boolean;
+
+  /** `loginStatus === "success"` */
   isLoginSuccess: boolean;
+
+  /** `loginStatus === "loginError"` */
   isLoginError: boolean;
+
   loginError?: Error;
 };
 
@@ -46,12 +66,16 @@ const InternetIdentityReactContext = createContext<ProviderValue | undefined>(
   undefined,
 );
 
+/**
+ * Create the auth client with default options or options provided by the user.
+ */
 async function createAuthClient(
   createOptions?: AuthClientCreateOptions,
 ): Promise<AuthClient> {
   const config = await loadConfig();
   const options: AuthClientCreateOptions = {
     idleOptions: {
+      // Default behaviour of this hook is not to logout and reload window on identity expiration
       disableDefaultIdleCallback: true,
       disableIdle: true,
       ...createOptions?.idleOptions,
@@ -65,6 +89,9 @@ async function createAuthClient(
   return authClient;
 }
 
+/**
+ * Helper function to set loginError state.
+ */
 function assertProviderPresent(
   context: ProviderValue | undefined,
 ): asserts context is ProviderValue {
@@ -75,17 +102,51 @@ function assertProviderPresent(
   }
 }
 
+/**
+ * Hook to access the internet identity as well as loginStatus along with
+ * login and clear functions.
+ */
 export const useInternetIdentity = (): InternetIdentityContext => {
   const context = useContext(InternetIdentityReactContext);
   assertProviderPresent(context);
   return context;
 };
 
+/**
+ * The InternetIdentityProvider component makes the saved identity available
+ * after page reloads. It also allows you to configure default options
+ * for AuthClient and login.
+ *
+ *
+ * @example
+ * ```tsx
+ * <InternetIdentityProvider>
+ *   <App />
+ * </InternetIdentityProvider>
+ * ```
+ */
 export function InternetIdentityProvider({
   children,
   createOptions,
 }: PropsWithChildren<{
+  /** The child components that the InternetIdentityProvider will wrap. This allows any child
+   * component to access the authentication context provided by the InternetIdentityProvider. */
   children: ReactNode;
+
+  /** Options for creating the {@link AuthClient}. See AuthClient documentation for list of options
+   *
+   * defaults to disabling the AuthClient idle handling (clearing identities
+   * from store and reloading the window on identity expiry). If that behaviour is preferred, set these settings:
+   *
+   * ```
+   * const options = {
+   *   idleOptions: {
+   *     disableDefaultIdleCallback: false,
+   *     disableIdle: false,
+   *   },
+   * }
+   * ```
+   */
   createOptions?: AuthClientCreateOptions;
 }>) {
   const [authClient, setAuthClient] = useState<AuthClient | undefined>(
@@ -117,23 +178,11 @@ export function InternetIdentityProvider({
     [setErrorMessage],
   );
 
-  /**
-   * login() -- uses a DIRECT navigation approach (no popups).
-   *
-   * Strategy:
-   * 1. Try opening II in a popup (desktop browsers usually allow this on user click).
-   * 2. If the popup is blocked or unavailable, fall back to redirect flow.
-   *
-   * This ensures compatibility with all browsers:
-   * - Desktop Chrome/Firefox: popup works fine
-   * - Safari/Samsung Browser/mobile browsers: popup may be blocked → redirect is used
-   *
-   * For redirect flow, Internet Identity redirects back to the app's current URL
-   * and the stored identity is picked up automatically on mount.
-   */
   const login = useCallback(() => {
     if (!authClient) {
-      setErrorMessage("AuthClient is not initialized yet, please try again.");
+      setErrorMessage(
+        "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
+      );
       return;
     }
 
@@ -143,50 +192,19 @@ export function InternetIdentityProvider({
       currentIdentity instanceof DelegationIdentity &&
       isDelegationValid(currentIdentity.getDelegation())
     ) {
-      // Already authenticated, just refresh identity state
-      setIdentity(currentIdentity);
-      setStatus("success");
+      setErrorMessage("User is already authenticated");
       return;
     }
 
-    setStatus("logging-in");
-
-    // Try popup first; if it fails (popup blocked), fall back to redirect.
-    let useRedirect = false;
-
-    // Test if popups are allowed by opening a blank window
-    const testPopup = window.open("", "_blank", "width=1,height=1");
-    if (!testPopup || testPopup.closed) {
-      useRedirect = true;
-    } else {
-      testPopup.close();
-    }
-
-    const baseOptions: AuthClientLoginOptions = {
+    const options: AuthClientLoginOptions = {
       identityProvider: DEFAULT_IDENTITY_PROVIDER,
       onSuccess: handleLoginSuccess,
       onError: handleLoginError,
       maxTimeToLive: ONE_HOUR_IN_NANOSECONDS * BigInt(24 * 30), // 30 days
     };
 
-    if (useRedirect) {
-      // Redirect flow: II redirects back to the current page after login.
-      // The stored delegation is loaded on app init automatically.
-      void authClient.login({
-        ...baseOptions,
-        // No windowOpenerFeatures means redirect mode on some auth-client versions
-      });
-    } else {
-      // Popup flow: open II in a centered popup window
-      const w = 525;
-      const h = 705;
-      const left = Math.max(0, Math.floor((screen.width - w) / 2));
-      const top = Math.max(0, Math.floor((screen.height - h) / 2));
-      void authClient.login({
-        ...baseOptions,
-        windowOpenerFeatures: `width=${w},height=${h},left=${left},top=${top},toolbar=0,location=0,menubar=0,resizable=1,scrollbars=1`,
-      });
-    }
+    setStatus("logging-in");
+    void authClient.login(options);
   }, [authClient, handleLoginError, handleLoginSuccess, setErrorMessage]);
 
   const clear = useCallback(() => {

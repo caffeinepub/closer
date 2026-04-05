@@ -24,9 +24,8 @@ export function useActor() {
         },
       };
 
-      // Create actor WITHOUT calling _initializeAccessControlWithSecret.
-      // That function resets admin state and causes "Hitilafu" errors.
-      // User registration is handled exclusively by registerProfile in ProfileSetup.
+      // Create actor with user identity -- NO _initializeAccessControlWithSecret call.
+      // That function caused errors and is not needed: first user to registerProfile becomes admin.
       const actor = await createActorWithConfig(actorOptions);
       return actor;
     },
