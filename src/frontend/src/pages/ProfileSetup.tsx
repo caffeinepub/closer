@@ -40,12 +40,16 @@ export function ProfileSetup() {
       return;
     }
     if (!actor) {
-      toast.error("Uunganisho umeshindwa -- jaribu tena");
+      toast.error(
+        "Uunganisho umeshindwa -- jaribu tena baada ya sekunde chache",
+      );
       return;
     }
 
     setSaving(true);
     try {
+      // registerProfile handles registration AND admin assignment (first user = admin)
+      // No need to call _initializeAccessControlWithSecret -- that causes errors
       await actor.registerProfile(
         name.trim(),
         phone.trim(),
@@ -53,7 +57,15 @@ export function ProfileSetup() {
         theme,
       );
 
-      // Check if caller became admin (e.g. first user)
+      // Save name to localStorage for quick recovery
+      try {
+        localStorage.setItem("ctm_user_name", name.trim());
+        localStorage.setItem("ctm_profile_name", name.trim());
+      } catch {
+        // ignore storage errors
+      }
+
+      // Check if caller became admin (first user)
       let isAdminNow = false;
       try {
         isAdminNow = await actor.isCallerAdmin();
@@ -70,22 +82,29 @@ export function ProfileSetup() {
         }
       }
 
-      // Force-refresh admin status from backend
+      // Force-refresh all queries including admin status
       await qc.invalidateQueries({ queryKey: ["isAdmin"] });
       await qc.refetchQueries({ queryKey: ["isAdmin"] });
       await qc.invalidateQueries();
 
       if (isAdminNow) {
-        toast.success("✅ Umesajiliwa kama Admin -- una udhibiti kamili!", {
-          duration: 6000,
-        });
+        toast.success("✅ Umesajiliwa kama Admin!", { duration: 6000 });
       } else {
-        toast.success("✅ Umesajiliwa!");
+        toast.success("✅ Umesajiliwa kikamilifu!");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Registration error:", msg);
-      toast.error("Hitilafu ya kusajili. Tafadhali jaribu tena.");
+      // Give a clear helpful error message in Swahili
+      if (msg.includes("Anonymous")) {
+        toast.error(
+          "Tafadhali ingia kwanza kwa Internet Identity, kisha ujaribu tena.",
+        );
+      } else {
+        toast.error(
+          "Hitilafu ya kuunganisha. Tafadhali angalia mtandao wako na ujaribu tena.",
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -240,7 +259,7 @@ export function ProfileSetup() {
 
           <Button
             onClick={submit}
-            disabled={saving}
+            disabled={saving || !name.trim()}
             className="w-full font-semibold py-5 rounded-xl"
             data-ocid="profile_setup.submit.primary_button"
             style={{
