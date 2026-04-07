@@ -150,6 +150,17 @@ actor {
     timestamp : Int;
   };
 
+  public type ShopReview = {
+    id : Nat;
+    shopId : Nat;
+    userId : Principal;
+    userName : Text;
+    rating : Nat;
+    comment : Text;
+    timestamp : Int;
+  };
+
+
   var nextShopId = 1;
   var nextProductId = 1;
   var nextOrderId = 1;
@@ -166,6 +177,8 @@ actor {
   let paymentReferences = Map.empty<Nat, PaymentReference>();
   var nextFeedbackId = 1;
   let feedbacks = Map.empty<Nat, AppFeedback>();
+  var nextShopReviewId = 1;
+  let shopReviews = Map.empty<Nat, ShopReview>();
 
   var appSettings : AppSettings = {
     platformPaymentNumber = "16334291";
@@ -561,7 +574,7 @@ actor {
           Runtime.trap("Insufficient stock");
         };
         let totalPrice = product.price * quantity;
-        let commissionAmount : Nat = 0;
+        let commissionAmount : Nat = totalPrice * 10 / 100;
         switch (userProfiles.get(caller)) {
           case (null) { Runtime.trap("User profile does not exist") };
           case (?userProfile) {
@@ -942,5 +955,46 @@ actor {
     };
   };
 
+
+
+  // Add a review for a shop
+  public shared ({ caller }) func addShopReview(shopId : Nat, rating : Nat, comment : Text) : async () {
+    if (caller.isAnonymous()) { Runtime.trap("Anonymous users cannot review") };
+    let profile = switch (userProfiles.get(caller)) {
+      case (?p) { p };
+      case (null) { Runtime.trap("Not registered") };
+    };
+    let clampedRating = if (rating < 1) 1 else if (rating > 5) 5 else rating;
+    let id = nextShopReviewId;
+    nextShopReviewId += 1;
+    let review : ShopReview = {
+      id;
+      shopId;
+      userId = caller;
+      userName = profile.name;
+      rating = clampedRating;
+      comment;
+      timestamp = Time.now();
+    };
+    shopReviews.add(id, review);
+  };
+
+  // Get all reviews for a shop
+  public query func getShopReviews(shopId : Nat) : async [ShopReview] {
+    shopReviews.values().toArray()
+      |> Array.filter(_, func(r : ShopReview) : Bool { r.shopId == shopId })
+      |> Array.sort(_, func(a : ShopReview, b : ShopReview) : Order.Order { Int.compare(b.timestamp, a.timestamp) })
+  };
+
+  // Get average rating for a shop: returns (totalRating * 10 / count, count) to avoid floats
+  public query func getShopAverageRating(shopId : Nat) : async (Nat, Nat) {
+    let reviews = shopReviews.values().toArray()
+      |> Array.filter(_, func(r : ShopReview) : Bool { r.shopId == shopId });
+    let count = reviews.size();
+    if (count == 0) { return (0, 0) };
+    var total = 0;
+    for (r in reviews.vals()) { total += r.rating };
+    (total * 10 / count, count)
+  };
 
 };

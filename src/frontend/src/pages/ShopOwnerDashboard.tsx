@@ -1638,6 +1638,18 @@ function OrderRow({
             Idadi: {Number(order.quantity)} • TZS{" "}
             {Number(order.totalPrice).toLocaleString()}
           </p>
+          {Number(order.commissionAmount) > 0 && (
+            <p
+              className="text-xs font-medium"
+              style={{ color: "hsl(25,80%,50%)" }}
+            >
+              Komisho (10%): TZS{" "}
+              {Number(order.commissionAmount).toLocaleString()} • Unalipwa: TZS{" "}
+              {(
+                Number(order.totalPrice) - Number(order.commissionAmount)
+              ).toLocaleString()}
+            </p>
+          )}
           {order.customerName && (
             <p
               className="text-xs font-medium"

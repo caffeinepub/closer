@@ -171,11 +171,6 @@ function OrderCard({
           >
             TZS {total.toLocaleString()}
           </p>
-          {Number(order.commissionAmount) > 0 && (
-            <p className="text-xs mt-0.5" style={{ color: "hsl(25,80%,50%)" }}>
-              Komisho: TZS {Number(order.commissionAmount).toLocaleString()}
-            </p>
-          )}
         </div>
       </div>
 

@@ -392,22 +392,12 @@ function AdminOrderCard({
           <InfoRow label="Bidhaa #" value={order.productId.toString()} />
           <InfoRow label="Idadi" value={Number(order.quantity).toString()} />
         </div>
-        <div className="text-right space-y-0.5">
-          <span
-            className="block font-bold text-sm"
-            style={{ color: "hsl(var(--primary))" }}
-          >
-            {formatTZS(order.totalPrice)}
-          </span>
-          {Number(order.commissionAmount) > 0 && (
-            <span
-              className="block text-xs font-medium"
-              style={{ color: "hsl(25,80%,50%)" }}
-            >
-              Komisho: {formatTZS(order.commissionAmount)}
-            </span>
-          )}
-        </div>
+        <span
+          className="font-bold text-sm"
+          style={{ color: "hsl(var(--primary))" }}
+        >
+          {formatTZS(order.totalPrice)}
+        </span>
       </div>
 
       {/* Payment status badge */}
