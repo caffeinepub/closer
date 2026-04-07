@@ -334,12 +334,16 @@ function AdminOrderCard({
   onConfirmPayment,
   onRejectPayment,
   isConfirming,
+  products,
+  shops,
 }: {
   order: Order;
   idx: number;
   onConfirmPayment: (orderId: bigint) => void;
   onRejectPayment: (orderId: bigint) => void;
   isConfirming?: boolean;
+  products: Product[];
+  shops: Shop[];
 }) {
   const [proofUrl, setProofUrl] = useState<string | null>(null);
 
@@ -389,7 +393,20 @@ function AdminOrderCard({
       <div className="flex items-center justify-between">
         <div className="text-xs space-y-0.5">
           <InfoRow label="Agizo #" value={order.id.toString()} />
-          <InfoRow label="Bidhaa #" value={order.productId.toString()} />
+          <InfoRow
+            label="Bidhaa"
+            value={
+              products.find((p) => p.id === order.productId)?.name ||
+              `Bidhaa #${order.productId.toString()}`
+            }
+          />
+          <InfoRow
+            label="Duka"
+            value={
+              shops.find((s) => s.id === order.shopId)?.name ||
+              `Duka #${order.shopId.toString()}`
+            }
+          />
           <InfoRow label="Idadi" value={Number(order.quantity).toString()} />
         </div>
         <div className="text-right space-y-0.5">
@@ -768,7 +785,7 @@ export function AdminPanel() {
               />
             ) : (
               <div className="space-y-3">
-                {allOrders.map((order, i) => (
+                {[...allOrders].reverse().map((order, i) => (
                   <AdminOrderCard
                     key={order.id.toString()}
                     order={order}
@@ -778,6 +795,8 @@ export function AdminPanel() {
                     isConfirming={
                       confirmPayment.isPending || rejectPayment.isPending
                     }
+                    products={products || []}
+                    shops={shops || []}
                   />
                 ))}
               </div>

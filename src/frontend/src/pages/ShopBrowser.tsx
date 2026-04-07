@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   ExternalLink,
   Facebook,
@@ -27,9 +28,13 @@ import { BUSINESS_CATEGORIES } from "../constants/categories";
 import {
   useActiveShops,
   useActiveShopsByCategory,
+  useAddShopReview,
   usePlaceOrder,
+  useShopAverageRating,
   useShopProducts,
+  useShopReviews,
 } from "../hooks/useQueries";
+import type { ShopReview } from "../types/shopReview";
 import { calcDistance, formatDistance } from "../utils/distance";
 
 function ShopAvatar({ shop, size = 40 }: { shop: Shop; size?: number }) {
@@ -238,6 +243,7 @@ function ShopCard({
                 ?.label || (shop as any).category}
             </span>
           )}
+          <ShopRatingBadge shopId={shop.id} />
           {shop.description && (
             <p
               className="text-xs mt-1 line-clamp-1"
@@ -497,6 +503,9 @@ function ShopModal({
           )}
         </div>
 
+        {/* Rating & Review */}
+        <ShopReviewSection shop={shop} />
+
         {/* Order confirm */}
         {orderProduct && (
           <div
@@ -591,6 +600,224 @@ function ShopModal({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ShopRatingBadge({ shopId }: { shopId: bigint }) {
+  const { data: avgRating } = useShopAverageRating(shopId);
+  if (!avgRating || Number(avgRating[1]) === 0) return null;
+  const avg = Number(avgRating[0]) / 10;
+  const count = Number(avgRating[1]);
+  return (
+    <span
+      className="inline-flex items-center gap-1 mt-1 text-xs font-medium"
+      style={{ color: "hsl(40,90%,45%)" }}
+    >
+      ⭐ {avg.toFixed(1)}
+      <span style={{ color: "hsl(var(--muted-foreground))" }}>
+        ({count} maoni)
+      </span>
+    </span>
+  );
+}
+
+function StarSelector({
+  value,
+  onChange,
+}: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          className="text-xl leading-none cursor-pointer select-none hover:scale-110 transition-transform"
+          style={{
+            color:
+              star <= value
+                ? "hsl(40,90%,50%)"
+                : "hsl(var(--muted-foreground))",
+          }}
+          data-ocid={`shop_review.star.${star}`}
+        >
+          {star <= value ? "⭐" : "☆"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ShopReviewSection({ shop }: { shop: ShopWithDistance }) {
+  const { data: reviews, isLoading: reviewsLoading } = useShopReviews(shop.id);
+  const { data: avgRating } = useShopAverageRating(shop.id);
+  const addReview = useAddShopReview();
+  const [myRating, setMyRating] = useState(0);
+  const [myComment, setMyComment] = useState("");
+
+  const handleSubmit = () => {
+    if (myRating === 0) {
+      toast.error("Tafadhali chagua nyota");
+      return;
+    }
+    addReview.mutate(
+      { shopId: shop.id, rating: myRating, comment: myComment },
+      {
+        onSuccess: () => {
+          toast.success("Maoni yametumwa!");
+          setMyRating(0);
+          setMyComment("");
+        },
+        onError: () => toast.error("Hitilafu — jaribu tena"),
+      },
+    );
+  };
+
+  const avgCount = avgRating ? Number(avgRating[1]) : 0;
+  const avgScore =
+    avgRating && avgCount > 0 ? (Number(avgRating[0]) / 10).toFixed(1) : null;
+
+  return (
+    <div className="mt-5" data-ocid="shop_review.section">
+      <h3
+        className="font-semibold text-sm mb-2"
+        style={{ color: "hsl(var(--foreground))" }}
+      >
+        Maoni ya Wateja
+      </h3>
+
+      {/* Average display */}
+      {avgScore && (
+        <div
+          className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl"
+          style={{ background: "hsl(40,90%,95%)" }}
+        >
+          <span
+            className="text-2xl font-bold"
+            style={{ color: "hsl(40,80%,45%)" }}
+          >
+            ⭐ {avgScore}
+          </span>
+          <span
+            className="text-xs"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            kutoka maoni {avgCount}
+          </span>
+        </div>
+      )}
+
+      {/* Review form */}
+      <div className="mb-4 space-y-2">
+        <StarSelector value={myRating} onChange={setMyRating} />
+        <Textarea
+          value={myComment}
+          onChange={(e) => setMyComment(e.target.value)}
+          placeholder="Andika maoni (hiari)"
+          className="text-sm resize-none"
+          rows={2}
+          data-ocid="shop_review.textarea"
+        />
+        <Button
+          size="sm"
+          onClick={handleSubmit}
+          disabled={addReview.isPending || myRating === 0}
+          data-ocid="shop_review.submit_button"
+          style={{
+            background: "hsl(var(--primary))",
+            color: "hsl(var(--primary-foreground))",
+          }}
+        >
+          {addReview.isPending ? "Inatuma..." : "Tuma Maoni"}
+        </Button>
+      </div>
+
+      {/* Reviews list */}
+      {reviewsLoading ? (
+        <p
+          className="text-xs"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          Inapakia...
+        </p>
+      ) : !reviews || reviews.length === 0 ? (
+        <p
+          className="text-xs py-2"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+          data-ocid="shop_review.empty_state"
+        >
+          Hakuna maoni bado
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {reviews.map((review: ShopReview, i: number) => (
+            <ReviewCard key={review.id.toString()} review={review} idx={i} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewCard({ review, idx }: { review: ShopReview; idx: number }) {
+  const stars = Number(review.rating);
+  const date = review.timestamp
+    ? new Date(Number(review.timestamp) / 1_000_000).toLocaleDateString(
+        "sw-TZ",
+        {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        },
+      )
+    : "";
+  return (
+    <div
+      className="rounded-xl px-3 py-2 space-y-1"
+      style={{ background: "hsl(var(--muted))" }}
+      data-ocid={`shop_review.item.${idx + 1}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="font-semibold text-xs"
+          style={{ color: "hsl(var(--foreground))" }}
+        >
+          {review.userName || "Mtumiaji"}
+        </span>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((si) => (
+            <span
+              key={`star-${si}`}
+              className="text-sm"
+              style={{
+                color:
+                  si <= stars
+                    ? "hsl(40,90%,50%)"
+                    : "hsl(var(--muted-foreground))",
+              }}
+            >
+              {si <= stars ? "⭐" : "☆"}
+            </span>
+          ))}
+        </div>
+      </div>
+      {review.comment && (
+        <p
+          className="text-xs"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          {review.comment}
+        </p>
+      )}
+      {date && (
+        <p
+          className="text-xs"
+          style={{ color: "hsl(var(--muted-foreground))", opacity: 0.7 }}
+        >
+          {date}
+        </p>
+      )}
+    </div>
   );
 }
 

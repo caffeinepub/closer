@@ -77,6 +77,15 @@ export interface AppFeedback {
     comment: string;
     timestamp: bigint;
 }
+export interface ShopReview {
+    id: bigint;
+    shopId: bigint;
+    userId: Principal;
+    userName: string;
+    rating: bigint;
+    comment: string;
+    timestamp: bigint;
+}
 export interface UserProfile {
     name: string;
     email: string;
@@ -151,4 +160,7 @@ export interface backendInterface {
     claimAdminIfNoneYet(): Promise<boolean>;
     forceResetAndClaimAdmin(secret: string): Promise<boolean>;
     promoteUserToAdmin(user: Principal): Promise<void>;
+    addShopReview(shopId: bigint, rating: bigint, comment: string): Promise<void>;
+    getShopReviews(shopId: bigint): Promise<Array<ShopReview>>;
+    getShopAverageRating(shopId: bigint): Promise<[bigint, bigint]>;
 }

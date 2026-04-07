@@ -9,6 +9,7 @@ import type {
   UserProfile,
 } from "../backend";
 import { ExternalBlob } from "../backend";
+import type { ShopReview } from "../types/shopReview";
 import { useActor } from "./useActor";
 
 export function useAllUserProfiles() {
@@ -605,6 +606,59 @@ export function useRejectPayment() {
       qc.invalidateQueries({ queryKey: ["allOrdersAdmin"] });
       qc.invalidateQueries({ queryKey: ["myOrders"] });
       qc.invalidateQueries({ queryKey: ["shopOrders"] });
+    },
+  });
+}
+
+export function useShopReviews(shopId: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<ShopReview[]>({
+    queryKey: ["shopReviews", shopId?.toString()],
+    queryFn: async () => {
+      if (!actor || shopId === null) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).getShopReviews(shopId);
+    },
+    enabled: !!actor && !isFetching && shopId !== null,
+  });
+}
+
+export function useShopAverageRating(shopId: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<[bigint, bigint]>({
+    queryKey: ["shopAvgRating", shopId?.toString()],
+    queryFn: async () => {
+      if (!actor || shopId === null) return [0n, 0n];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).getShopAverageRating(shopId);
+    },
+    enabled: !!actor && !isFetching && shopId !== null,
+  });
+}
+
+export function useAddShopReview() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      shopId,
+      rating,
+      comment,
+    }: { shopId: bigint; rating: number; comment: string }) => {
+      if (!actor) throw new Error("Not connected");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).addShopReview(shopId, BigInt(rating), comment);
+    },
+    onSuccess: (
+      _: unknown,
+      vars: { shopId: bigint; rating: number; comment: string },
+    ) => {
+      qc.invalidateQueries({
+        queryKey: ["shopReviews", vars.shopId.toString()],
+      });
+      qc.invalidateQueries({
+        queryKey: ["shopAvgRating", vars.shopId.toString()],
+      });
     },
   });
 }
